@@ -482,7 +482,7 @@ class JobsWidgetRendererTest extends BaseJobsTest
    }
 
    /*******************************************************************************
-    ** RC.5 instances still render attention and progress without an effects table.
+    ** Attention and progress tolerate a host omitting the effects table.
     *******************************************************************************/
    @Test
    void widgetsWithoutEffectsTable() throws Exception

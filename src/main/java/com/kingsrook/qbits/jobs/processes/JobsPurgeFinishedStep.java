@@ -90,7 +90,7 @@ public class JobsPurgeFinishedStep implements BackendStep
    }
 
    /*******************************************************************************
-    ** Storage seam for testing RC.7 deletion semantics against RC.5.
+    ** Storage seam for testing deletion failures and retries.
     *******************************************************************************/
    public JobsPurgeFinishedStep(JobsStorage storage)
    {
@@ -127,7 +127,7 @@ public class JobsPurgeFinishedStep implements BackendStep
       summary.add(new ProcessSummaryLine(Status.INFO, counts[2], "input objects deleted"));
       if(counts[3] > 0)
       {
-         summary.add(new ProcessSummaryLine(Status.INFO, counts[3], "jobs kept: effects still outstanding"));
+         summary.add(new ProcessSummaryLine(Status.INFO, counts[3], "jobs kept: effects still unsettled"));
       }
       output.addValue(StreamedETLWithFrontendProcess.FIELD_PROCESS_SUMMARY, summary);
    }
@@ -150,7 +150,7 @@ public class JobsPurgeFinishedStep implements BackendStep
          for(QRecord job : jobs)
          {
             lastId = job.getValueInteger(ID);
-            if(hasOutstandingEffects(lastId))
+            if(hasUnsettledEffects(lastId))
             {
                counts[3]++;
                continue;
@@ -172,17 +172,17 @@ public class JobsPurgeFinishedStep implements BackendStep
    /*******************************************************************************
     ** Preserve unresolved outbox work, including unknown or missing statuses.
     *******************************************************************************/
-   private boolean hasOutstandingEffects(int jobId) throws QException
+   private boolean hasUnsettledEffects(int jobId) throws QException
    {
       if(QContext.getQInstance().getTable(JOBS_EFFECT) == null)
       {
          return (false);
       }
-      QQueryFilter outstanding = new QQueryFilter().withBooleanOperator(QQueryFilter.BooleanOperator.OR)
+      QQueryFilter unsettled = new QQueryFilter().withBooleanOperator(QQueryFilter.BooleanOperator.OR)
          .withCriteria(STATUS, QCriteriaOperator.NOT_IN, List.of(SENT, FAILED))
          .withCriteria(STATUS, QCriteriaOperator.IS_BLANK)
          .withCriteria(NEEDS_REVIEW_FIELD, QCriteriaOperator.EQUALS, true);
-      QQueryFilter filter = new QQueryFilter().withCriteria(JOB_ID, QCriteriaOperator.EQUALS, jobId).withSubFilter(outstanding).withLimit(1);
+      QQueryFilter filter = new QQueryFilter().withCriteria(JOB_ID, QCriteriaOperator.EQUALS, jobId).withSubFilter(unsettled).withLimit(1);
       return (!new QueryAction().execute(new QueryInput().withTableName(JOBS_EFFECT).withFilter(filter)).getRecords().isEmpty());
    }
 
@@ -234,7 +234,7 @@ public class JobsPurgeFinishedStep implements BackendStep
          for(QRecord job : jobs)
          {
             lastId = job.getValueInteger(ID);
-            if(!hasOutstandingEffects(lastId))
+            if(!hasUnsettledEffects(lastId))
             {
                cleanJobInputs(lastId, counts);
             }

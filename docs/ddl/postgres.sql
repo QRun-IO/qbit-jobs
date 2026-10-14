@@ -1,4 +1,4 @@
--- Durable jobs schema, copied from core prime-durable-jobs.sql (QRun-IO/qqq#1178).
+-- Durable jobs schema matching QQQ 4.1.0-RC.7 DurableJobsMetaDataProvider.
 -- Snake-case columns; excludes test fixtures and destructive DROP statements.
 
 CREATE TABLE jobs_job
@@ -96,7 +96,7 @@ CREATE TABLE jobs_row_error
 
 CREATE INDEX jobs_row_error_job_idx ON jobs_row_error (job_id);
 
--- STAND-IN(core=QRun-IO/qqq#1191, removeBy=RC.7): transactional outbox.
+-- Transactional outbox.
 CREATE TABLE jobs_effect
 (
    id                 SERIAL PRIMARY KEY,

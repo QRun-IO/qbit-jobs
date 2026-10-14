@@ -171,7 +171,7 @@
 
    <profiles>
       <!-- Built against qqq 4.1. Until qbit-build-parent imports the released 4.1 BOM, this    -->
-      <!-- profile is active by default and imports qqq-bom-pom 4.1.0-RC.5 ahead of the parent's -->
+      <!-- profile is active by default and imports qqq-bom-pom 4.1.0-RC.7 ahead of the parent's -->
       <!-- 4.0.0 BOM (ADR-0007, as in the other qbits).                                          -->
       <profile>
          <id>qqq-snapshot</id>
@@ -179,7 +179,7 @@
             <activeByDefault>true</activeByDefault>
          </activation>
          <properties>
-            <qqq.snapshot.version>4.1.0-RC.5</qqq.snapshot.version>
+            <qqq.snapshot.version>4.1.0-RC.7</qqq.snapshot.version>
          </properties>
          <dependencyManagement>
             <dependencies>
@@ -206,12 +206,12 @@
          </repositories>
       </profile>
 
-      <!-- Local demo server and screenshots only (never in CI): builds src/demo/java against a  -->
-      <!-- locally installed QQQ with the durable job kernel, e.g. -Dqqq.snapshot.version=4.1.0-JOBS-SNAPSHOT. -->
+      <!-- Local demo server and screenshots: builds src/demo/java against released QQQ RC.7. -->
+      <!-- The version property remains overridable, as in the default profile. -->
       <profile>
          <id>demo</id>
          <properties>
-            <qqq.snapshot.version>4.1.0-SNAPSHOT</qqq.snapshot.version>
+            <qqq.snapshot.version>4.1.0-RC.7</qqq.snapshot.version>
          </properties>
          <dependencyManagement>
             <dependencies>
