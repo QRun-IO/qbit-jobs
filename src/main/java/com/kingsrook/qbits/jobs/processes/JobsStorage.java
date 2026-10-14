@@ -32,9 +32,9 @@ import static com.kingsrook.qbits.jobs.JobsCoreContract.DURABLE_JOBS_METADATA;
 
 
 /*******************************************************************************
- ** STAND-IN(core=QRun-IO/qqq#1173, removeBy=RC.6): reflectively call StorageAction
+ ** STAND-IN(core=QRun-IO/qqq#1173, removeBy=RC.7): reflectively call StorageAction
  ** deleteObject until the released core contains that method. Never touch disk.
- ** STAND-IN(core=QRun-IO/qqq#1178, removeBy=RC.6): read durable jobs supplemental
+ ** STAND-IN(core=QRun-IO/qqq#1178, removeBy=RC.7): read durable jobs supplemental
  ** metadata reflectively until its type is available in the released core.
  *******************************************************************************/
 public class JobsStorage

@@ -149,7 +149,7 @@ import static com.kingsrook.qbits.jobs.JobsCoreContract.VERSION;
 
 
 /*******************************************************************************
- ** STAND-IN(core=QRun-IO/qqq#1178, removeBy=RC.6): test-only mirror of the core
+ ** STAND-IN(core=QRun-IO/qqq#1178, removeBy=RC.7): test-only mirror of the core
  ** tables, field types, primary keys, owner locks and child joins. Includes uploads
  ** so retention is exercised against the complete contract.
  *******************************************************************************/
@@ -292,7 +292,7 @@ public final class JobsTablesStandIn
    }
 
    /*******************************************************************************
-    ** STAND-IN(core=QRun-IO/qqq#1191, removeBy=RC.6): outbox fields and possible values.
+    ** STAND-IN(core=QRun-IO/qqq#1191, removeBy=RC.7): outbox fields and possible values.
     *******************************************************************************/
    private static void defineEffects(QInstance instance) throws QException
    {
