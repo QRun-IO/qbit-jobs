@@ -6,7 +6,7 @@ This file provides guidance to Codex when working with this repository.
 
 QBit Jobs is the typed Jobs dashboard, record panels, alert declarations and retention
 process for QQQ durable jobs. Read `docs/DESIGN.md` and `README.md` first. Core owns
-all six `jobs_*` tables and control actions. This qbit adds no tables and no client UI.
+all seven `jobs_*` tables and control actions. This qbit adds no tables and no client UI.
 
 ## Build commands
 
@@ -27,17 +27,17 @@ and the memory backend. No Docker or external services. Do not commit in this sa
 ## Architecture by package
 
 - `com.kingsrook.qbits.jobs`: `JobsQBitProducer` registers the app and metadata directly;
-  `JobsQBitConfig` supplies validated host settings; `JobsCoreContract` holds temporary
-  core identifiers; `JobsSecurity` derives owner/admin session keys; `JobsIntegrations`
+  `JobsQBitConfig` supplies validated host settings; `JobsCoreContract` references core identifiers
+  and field names; core `DurableJobsSecurity` derives owner/admin session keys; `JobsIntegrations`
   supplies opt-in ESB, Quick Search and Data Analysis table lists.
 - `widgets`: `JobsWidgetRenderer` dispatches the eight home/record panels;
   `JobsChartData` provides typed stacked bars; `JobsChildRecordListRenderer` ensures
   session keys before delegating to core's child-list renderer.
 - `processes`: `JobsPurgeFinishedStep` performs retention with 200-row keyset batches;
-  `JobsStorage` isolates reflective core storage/metadata compatibility.
-- Tests: `BaseJobsTest`, `JobsTablesStandIn`, `JobsAlertsValidationStandIn`, plus producer,
-  renderer, security and retention suites. Test storage emulates the future deletion API
-  without filesystem access; the real RC.5 adapter's skip behavior is tested separately.
+  `JobsStorage` uses core storage actions and durable jobs metadata.
+- Tests: `BaseJobsTest` uses core `DurableJobsMetaDataProvider` and `DurableJobsMetaData`,
+  plus producer, renderer, security and retention suites. Memory storage verifies real
+  object deletion; a recording storage seam exercises failures and retries.
 
 ## Invariants
 
@@ -64,25 +64,16 @@ and the memory backend. No Docker or external services. Do not commit in this sa
   every class/method, fluent `withX` setters and the Kingsrook Apache license header.
 - Enforce the repository's `checkstyle/config.xml`; do not weaken gates to pass builds.
 
-## Dependencies and stand-ins
+## Dependencies
 
-Parent `com.kingsrook:qbit-build-parent:2.0.0`; default `qqq-snapshot` profile imports
-released core BOM `4.1.0-RC.5`. Main code and default tests must not import `core.jobs`.
-The opt-in `demo` profile selects locally installed `4.1.0-SNAPSHOT`, adds `src/demo/java`
-and test RDBMS/Javalin/H2 dependencies. No demo server is provided yet.
-
-Remove stand-ins when RC.6 supplies the contracts:
-
-- `JobsCoreContract`, `JobsSecurity`, test `JobsTablesStandIn`: core #1178.
-- `JobsStorage`: #1173 deleteObject method and #1178 durableJobs metadata getter.
-- Test `JobsAlertsValidationStandIn`: #1178 kernel identifiers use underscores rejected
-  by the released alert-name validator. Only those two errors are waived in tests;
-  production validation remains strict. A core validator fix is required for startup.
+Parent `com.kingsrook:qbit-build-parent:2.0.0`; QQQ 4.1.0-RC.7 or later is required.
+The default `qqq-snapshot` profile imports released core BOM `4.1.0-RC.7`.
+The opt-in `demo` profile uses the same release, adds `src/demo/java` and test
+RDBMS/Javalin/H2 dependencies for the demo server.
 
 ## Release flow
 
 CircleCI uses `kingsrook/qqq-orb@0.6.8`: feature branches test; `develop` publishes
 SNAPSHOTs; `release/*` publishes RCs; `v*` tags publish stable releases. The GitHub
 release-candidate workflow follows the repository standard. Publishing requires explicit
-owner authorization. Update CHANGELOG and resolve the RC.6 compatibility requirements
-before a release; do not change another repository from this workspace.
+owner authorization. Update CHANGELOG before a release; do not change another repository from this workspace.

@@ -30,12 +30,16 @@ import com.kingsrook.qbits.jobs.processes.JobsStorage;
 import com.kingsrook.qqq.backend.core.actions.tables.UpdateAction;
 import com.kingsrook.qqq.backend.core.context.QContext;
 import com.kingsrook.qqq.backend.core.exceptions.QException;
+import com.kingsrook.qqq.backend.core.jobs.DurableJobsMetaData;
+import com.kingsrook.qqq.backend.core.jobs.DurableJobsSecurity;
 import com.kingsrook.qqq.backend.core.model.actions.processes.ProcessSummaryLine;
 import com.kingsrook.qqq.backend.core.model.actions.processes.RunBackendStepInput;
 import com.kingsrook.qqq.backend.core.model.actions.processes.RunBackendStepOutput;
 import com.kingsrook.qqq.backend.core.model.actions.tables.update.UpdateInput;
 import com.kingsrook.qqq.backend.core.model.data.QRecord;
-import com.kingsrook.qqq.backend.core.model.metadata.QSupplementalInstanceMetaData;
+import com.kingsrook.qqq.backend.core.model.metadata.fields.QFieldMetaData;
+import com.kingsrook.qqq.backend.core.model.metadata.fields.QFieldType;
+import com.kingsrook.qqq.backend.core.model.metadata.tables.QTableMetaData;
 import com.kingsrook.qqq.backend.core.model.session.QSession;
 import com.kingsrook.qqq.backend.core.model.session.QSystemUserSession;
 import com.kingsrook.qqq.backend.core.processes.implementations.etl.streamedwithfrontend.StreamedETLWithFrontendProcess;
@@ -87,18 +91,19 @@ class JobsRetentionTest extends BaseJobsTest
       children(job(USER_B, RUNNING, now.minus(40, ChronoUnit.DAYS)));
       children(job(USER_A, COMPLETED, now.minus(2, ChronoUnit.DAYS)));
       children(job(USER_A, NEEDS_REVIEW, now.minus(40, ChronoUnit.DAYS)));
+      List<Integer> auditIds = records(AUDIT).stream().map(record -> record.getValueInteger(ID)).toList();
       RecordingStorage storage = new RecordingStorage();
       QSession caller = login("admin", true);
       List<ProcessSummaryLine> summary = run(new JobsPurgeFinishedStep(storage));
       assertThat(QContext.getQSession()).isSameAs(caller);
       assertThat(summary).extracting(ProcessSummaryLine::getCount).containsExactly(4, 4, 4);
-      JobsSecurity.ensureSessionKeys(caller);
+      DurableJobsSecurity.ensureSessionKeys(caller);
       assertThat(records(JOBS_JOB)).hasSize(3).extracting(record -> record.getValueString(STATUS)).containsExactly(RUNNING, COMPLETED, NEEDS_REVIEW);
       for(String table : List.of(JOBS_CHUNK, JOBS_ROW_ERROR, JOBS_EVENT, JOBS_UPLOAD))
       {
          assertThat(records(table)).hasSize(3);
       }
-      assertThat(records(AUDIT)).hasSize(7);
+      assertThat(records(AUDIT)).extracting(record -> record.getValueInteger(ID)).containsAll(auditIds);
       assertThat(storage.deleted).hasSize(8);
       assertThat(run(new JobsPurgeFinishedStep(storage))).extracting(ProcessSummaryLine::getCount).containsExactly(0, 0, 0);
    }
@@ -155,20 +160,30 @@ class JobsRetentionTest extends BaseJobsTest
    }
 
    /*******************************************************************************
-    ** RC.5 safely skips unavailable object deletion and preserves retry references.
+    ** Core storage deletes input objects before retention clears their references.
     *******************************************************************************/
    @Test
-   void releasedCoreSkipsObjectDeletion() throws Exception
+   void releasedCoreDeletesObjects() throws Exception
    {
       QRecord clean = job(USER_A, COMPLETED, now.minus(8, ChronoUnit.DAYS));
       clearFailures(clean);
       children(clean);
-      instance.withSupplementalMetaData(new StorageMetadata());
-      assertThat(run(new JobsPurgeFinishedStep())).extracting(ProcessSummaryLine::getCount).containsExactly(0, 0, 0);
+      instance.addTable(new QTableMetaData().withName("objects").withBackendName("memory").withPrimaryKeyField(ID)
+         .withField(new QFieldMetaData(ID, QFieldType.STRING)).withField(new QFieldMetaData("data", QFieldType.BLOB)));
+      instance.withSupplementalMetaData(new DurableJobsMetaData().withStorageTableName("objects"));
+      QSession caller = QContext.getQSession();
+      assertThatThrownBy(() -> run(new JobsPurgeFinishedStep())).isInstanceOf(QException.class);
+      assertThat(QContext.getQSession()).isSameAs(caller);
       assertThat(records(JOBS_CHUNK).getFirst().getValue(INPUT_STORAGE_REF)).isNotNull();
+      insert("objects", new QRecord().withValue(ID, "chunk/" + clean.getValue(ID)).withValue("data", new byte[] {1}));
+      assertThat(run(new JobsPurgeFinishedStep())).extracting(ProcessSummaryLine::getCount).containsExactly(0, 0, 1);
+      assertThat(records(JOBS_CHUNK).getFirst().getValue(INPUT_STORAGE_REF)).isNull();
       JobsStorage storage = new JobsStorage();
       assertThat(storage.chunkStorageTable()).isEqualTo("objects");
-      assertThat(storage.delete("objects", "another-object")).isFalse();
+      assertThat(records("objects")).isEmpty();
+      assertThatThrownBy(() -> storage.delete("objects", "missing-object")).isInstanceOf(QException.class);
+      assertThat(storage.delete("", "object")).isFalse();
+      assertThat(storage.delete("objects", " ")).isFalse();
       assertThat(storage.delete(null, "object")).isFalse();
       assertThat(storage.delete("objects", null)).isFalse();
    }
@@ -185,7 +200,7 @@ class JobsRetentionTest extends BaseJobsTest
       storage.fail = true;
       assertThatThrownBy(() -> run(new JobsPurgeFinishedStep(storage))).hasMessageContaining("storage unavailable");
       assertThat(QContext.getQSession()).isSameAs(caller);
-      JobsSecurity.ensureSessionKeys(caller);
+      DurableJobsSecurity.ensureSessionKeys(caller);
       assertThat(records(JOBS_JOB)).hasSize(1);
       assertThat(records(JOBS_CHUNK)).hasSize(1);
       storage.fail = false;
@@ -209,12 +224,13 @@ class JobsRetentionTest extends BaseJobsTest
    @Test
    void absentStorageMetadata() throws Exception
    {
+      instance.getSupplementalMetaData().remove(DURABLE_JOBS_METADATA);
       assertThat(new JobsStorage().chunkStorageTable()).isNull();
       assertThat(run(new JobsPurgeFinishedStep())).extracting(ProcessSummaryLine::getCount).containsExactly(0, 0, 0);
    }
 
    /*******************************************************************************
-    ** Outstanding effects preserve every child and input; settled effects are paged away.
+    ** Unsettled effects preserve every child and input; settled effects are paged away.
     *******************************************************************************/
    @Test
    void effectsBlockPurgeUntilSettled() throws Exception
@@ -243,8 +259,8 @@ class JobsRetentionTest extends BaseJobsTest
       List<ProcessSummaryLine> summary = run(new JobsPurgeFinishedStep(storage));
       assertThat(QContext.getQSession()).isSameAs(caller);
       assertThat(summary).extracting(ProcessSummaryLine::getCount).containsExactly(1, 1, 1, 4);
-      assertThat(summary.getLast().getMessage()).isEqualTo("jobs kept: effects still outstanding");
-      JobsSecurity.ensureSessionKeys(caller);
+      assertThat(summary.getLast().getMessage()).isEqualTo("jobs kept: effects still unsettled");
+      DurableJobsSecurity.ensureSessionKeys(caller);
       assertThat(records(JOBS_JOB)).extracting(record -> record.getValue(ID)).containsExactlyElementsOf(kept.stream().map(record -> record.getValue(ID)).toList());
       assertThat(records(JOBS_EFFECT)).hasSize(4);
       for(String table : List.of(JOBS_CHUNK, JOBS_ROW_ERROR, JOBS_EVENT, JOBS_UPLOAD))
@@ -264,7 +280,7 @@ class JobsRetentionTest extends BaseJobsTest
    }
 
    /*******************************************************************************
-    ** Effects remain optional for retention against older cores.
+    ** Retention tolerates a host omitting the effects table.
     *******************************************************************************/
    @Test
    void purgeWithoutEffectsTable() throws Exception
@@ -296,7 +312,7 @@ class JobsRetentionTest extends BaseJobsTest
    }
 
    /*******************************************************************************
-    ** Test storage models successful RC.7 object deletion, without using disk.
+    ** Test storage records deletions and simulates failures without using disk.
     *******************************************************************************/
    private static class RecordingStorage extends JobsStorage
    {
@@ -332,26 +348,4 @@ class JobsRetentionTest extends BaseJobsTest
       }
    }
 
-   /*******************************************************************************
-    ** Test-only supplemental metadata for the RC.5 reflection bridge.
-    *******************************************************************************/
-   public static class StorageMetadata implements QSupplementalInstanceMetaData
-   {
-      /*******************************************************************************
-       ** Core metadata contract name.
-       *******************************************************************************/
-      @Override
-      public String getName()
-      {
-         return (DURABLE_JOBS_METADATA);
-      }
-
-      /*******************************************************************************
-       ** Future core getter discovered reflectively by the adapter.
-       *******************************************************************************/
-      public String getStorageTableName()
-      {
-         return ("objects");
-      }
-   }
 }

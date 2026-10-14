@@ -23,28 +23,36 @@ package com.kingsrook.qbits.jobs;
 
 
 import java.util.List;
-import com.kingsrook.qqq.backend.core.model.metadata.joins.QJoinMetaData;
+import com.kingsrook.qqq.backend.core.jobs.DurableJobsMetaData;
+import com.kingsrook.qqq.backend.core.jobs.DurableJobsMetaDataProvider;
+import com.kingsrook.qqq.backend.core.jobs.DurableJobsTables;
+import com.kingsrook.qqq.backend.core.jobs.effects.EffectStatus;
+import com.kingsrook.qqq.backend.core.jobs.effects.JobEffectType;
+import com.kingsrook.qqq.backend.core.jobs.model.ChunkStatus;
+import com.kingsrook.qqq.backend.core.jobs.model.JobStatus;
+import com.kingsrook.qqq.backend.core.jobs.runtime.JobSignals;
+import com.kingsrook.qqq.backend.core.model.audits.AuditsMetaDataProvider;
 
 
 /*******************************************************************************
- ** STAND-IN(core=QRun-IO/qqq#1178, removeBy=RC.7): mirrors core DurableJobsTables and friends; switch to core's constants when RC.7 is released.
+ ** Core identifiers and field names used by the Jobs app.
  *******************************************************************************/
 public final class JobsCoreContract
 {
-   public static final String JOBS_JOB = "jobs_job";
-   public static final String JOBS_CHUNK = "jobs_chunk";
-   public static final String JOBS_ROW_ERROR = "jobs_row_error";
-   public static final String JOBS_EVENT = "jobs_event";
-   public static final String JOBS_WORKER = "jobs_worker";
-   public static final String JOBS_UPLOAD = "jobs_upload";
-   public static final String JOBS_USER = "jobs_user";
-   public static final String JOBS_USER_ALL_ACCESS = "jobs_user_all_access";
-   public static final String JOBS_ADMIN = "jobs_admin";
-   public static final String ALERT_JOB_FAILED = "jobs.job-failed";
-   public static final String ALERT_JOB_STALLED = "jobs.job-stalled";
-   public static final String HEARTBEAT_REAPER = "jobs.reaper";
-   public static final String DURABLE_JOBS_METADATA = "durableJobs";
-   public static final String AUDIT = "audit";
+   public static final String JOBS_JOB = DurableJobsTables.TABLE_JOB;
+   public static final String JOBS_CHUNK = DurableJobsTables.TABLE_CHUNK;
+   public static final String JOBS_ROW_ERROR = DurableJobsTables.TABLE_ROW_ERROR;
+   public static final String JOBS_EVENT = DurableJobsTables.TABLE_EVENT;
+   public static final String JOBS_WORKER = DurableJobsTables.TABLE_WORKER;
+   public static final String JOBS_UPLOAD = DurableJobsTables.TABLE_UPLOAD;
+   public static final String JOBS_USER = DurableJobsTables.SECURITY_KEY_USER;
+   public static final String JOBS_USER_ALL_ACCESS = DurableJobsTables.SECURITY_KEY_USER_ALL_ACCESS;
+   public static final String JOBS_ADMIN = DurableJobsTables.PERMISSION_ADMIN;
+   public static final String ALERT_JOB_FAILED = JobSignals.ALERT_JOB_FAILED;
+   public static final String ALERT_JOB_STALLED = JobSignals.ALERT_JOB_STALLED;
+   public static final String HEARTBEAT_REAPER = JobSignals.HEARTBEAT_REAPER;
+   public static final String DURABLE_JOBS_METADATA = DurableJobsMetaData.NAME;
+   public static final String AUDIT = AuditsMetaDataProvider.TABLE_NAME_AUDIT;
    public static final String ID = "id";
    public static final String LABEL = "label";
    public static final String PROCESS_NAME = "processName";
@@ -118,25 +126,24 @@ public final class JobsCoreContract
    public static final String STORAGE_TABLE_NAME = "storageTableName";
    public static final String STORAGE_REFERENCE = "storageReference";
    public static final String EXPIRES_AT = "expiresAt";
-   public static final String PLANNING = "PLANNING";
-   public static final String AWAITING_CONFIRMATION = "AWAITING_CONFIRMATION";
-   public static final String QUEUED = "QUEUED";
-   public static final String RUNNING = "RUNNING";
-   public static final String PAUSING = "PAUSING";
-   public static final String PAUSED = "PAUSED";
-   public static final String CANCELLING = "CANCELLING";
-   public static final String CANCELLED = "CANCELLED";
-   public static final String COMPLETED = "COMPLETED";
-   public static final String COMPLETED_WITH_ERRORS = "COMPLETED_WITH_ERRORS";
-   public static final String FAILED = "FAILED";
-   public static final String NEEDS_REVIEW = "NEEDS_REVIEW";
-   public static final String DONE = "DONE";
+   public static final String PLANNING = JobStatus.PLANNING.getPossibleValueId();
+   public static final String AWAITING_CONFIRMATION = JobStatus.AWAITING_CONFIRMATION.getPossibleValueId();
+   public static final String QUEUED = JobStatus.QUEUED.getPossibleValueId();
+   public static final String RUNNING = JobStatus.RUNNING.getPossibleValueId();
+   public static final String PAUSING = JobStatus.PAUSING.getPossibleValueId();
+   public static final String PAUSED = JobStatus.PAUSED.getPossibleValueId();
+   public static final String CANCELLING = JobStatus.CANCELLING.getPossibleValueId();
+   public static final String CANCELLED = JobStatus.CANCELLED.getPossibleValueId();
+   public static final String COMPLETED = JobStatus.COMPLETED.getPossibleValueId();
+   public static final String COMPLETED_WITH_ERRORS = JobStatus.COMPLETED_WITH_ERRORS.getPossibleValueId();
+   public static final String FAILED = JobStatus.FAILED.getPossibleValueId();
+   public static final String NEEDS_REVIEW = JobStatus.NEEDS_REVIEW.getPossibleValueId();
+   public static final String DONE = ChunkStatus.DONE.getPossibleValueId();
 
-   // STAND-IN(core=QRun-IO/qqq#1191, removeBy=RC.7): transactional outbox contract.
-   public static final String JOBS_EFFECT = "jobs_effect";
-   public static final String JOBS_EFFECT_STATUS = "jobs_effect_status";
-   public static final String JOBS_EFFECT_TYPE = "jobs_effect_type";
-   public static final String ALERT_EFFECT_UNRESOLVED = "jobs.effect-unresolved";
+   public static final String JOBS_EFFECT = DurableJobsTables.TABLE_EFFECT;
+   public static final String JOBS_EFFECT_STATUS = EffectStatus.NAME;
+   public static final String JOBS_EFFECT_TYPE = JobEffectType.NAME;
+   public static final String ALERT_EFFECT_UNRESOLVED = JobSignals.ALERT_EFFECT_UNRESOLVED;
    public static final String EFFECT_NAME = "effectName";
    public static final String NEEDS_REVIEW_FIELD = "needsReview";
    public static final String ROW_KEY = "rowKey";
@@ -151,13 +158,13 @@ public final class JobsCoreContract
    public static final String PROVIDER_REF = "providerRef";
    public static final String LAST_ERROR = "lastError";
    public static final String SENT_AT = "sentAt";
-   public static final String PENDING = "PENDING";
-   public static final String SENDING = "SENDING";
-   public static final String SENT = "SENT";
-   public static final String UNKNOWN = "UNKNOWN";
-   public static final String LOCAL_TX = "LOCAL_TX";
-   public static final String IDEMPOTENT_EXTERNAL = "IDEMPOTENT_EXTERNAL";
-   public static final String NON_IDEMPOTENT_EXTERNAL = "NON_IDEMPOTENT_EXTERNAL";
+   public static final String PENDING = EffectStatus.PENDING.getPossibleValueId();
+   public static final String SENDING = EffectStatus.SENDING.getPossibleValueId();
+   public static final String SENT = EffectStatus.SENT.getPossibleValueId();
+   public static final String UNKNOWN = EffectStatus.UNKNOWN.getPossibleValueId();
+   public static final String LOCAL_TX = JobEffectType.LOCAL_TX.getPossibleValueId();
+   public static final String IDEMPOTENT_EXTERNAL = JobEffectType.IDEMPOTENT_EXTERNAL.getPossibleValueId();
+   public static final String NON_IDEMPOTENT_EXTERNAL = JobEffectType.NON_IDEMPOTENT_EXTERNAL.getPossibleValueId();
 
    public static final List<String> DATA_TABLES = List.of(JOBS_JOB, JOBS_CHUNK, JOBS_ROW_ERROR, JOBS_EFFECT, JOBS_EVENT, JOBS_WORKER);
    public static final List<String> ALL_TABLES = List.of(JOBS_JOB, JOBS_CHUNK, JOBS_ROW_ERROR, JOBS_EVENT, JOBS_WORKER, JOBS_UPLOAD);
@@ -178,7 +185,7 @@ public final class JobsCoreContract
     *******************************************************************************/
    public static String childJoin(String child)
    {
-      return (QJoinMetaData.makeInferredJoinName(JOBS_JOB, child));
+      return (DurableJobsMetaDataProvider.childJoinName(child));
    }
 
    /*******************************************************************************
@@ -191,21 +198,13 @@ public final class JobsCoreContract
       {
          return ("Unknown");
       }
-      return (switch(status)
+      try
       {
-         case AWAITING_CONFIRMATION -> "Awaiting Confirmation";
-         case QUEUED -> "Queued";
-         case PLANNING -> "Planning";
-         case RUNNING -> "Running";
-         case PAUSING -> "Pausing";
-         case PAUSED -> "Paused";
-         case CANCELLING -> "Cancelling";
-         case CANCELLED -> "Cancelled";
-         case COMPLETED -> "Completed";
-         case COMPLETED_WITH_ERRORS -> "Completed With Errors";
-         case FAILED -> "Failed";
-         case NEEDS_REVIEW -> "Needs Review";
-         default -> status;
-      });
+         return (JobStatus.valueOf(status).getPossibleValueLabel());
+      }
+      catch(IllegalArgumentException e)
+      {
+         return (status);
+      }
    }
 }

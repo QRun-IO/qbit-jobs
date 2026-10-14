@@ -30,6 +30,8 @@ import com.kingsrook.qqq.backend.core.alerts.AlertsInstanceMetaData;
 import com.kingsrook.qqq.backend.core.alerts.QAlertTypeMetaData;
 import com.kingsrook.qqq.backend.core.exceptions.QException;
 import com.kingsrook.qqq.backend.core.instances.QInstanceValidator;
+import com.kingsrook.qqq.backend.core.jobs.DurableJobsMetaData;
+import com.kingsrook.qqq.backend.core.jobs.DurableJobsMetaDataProvider;
 import com.kingsrook.qqq.backend.core.model.dashboard.widgets.WidgetType;
 import com.kingsrook.qqq.backend.core.model.metadata.QInstance;
 import com.kingsrook.qqq.backend.core.model.metadata.qbits.QBitMetaData;
@@ -65,6 +67,17 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class JobsQBitProducerTest extends BaseJobsTest
 {
    /*******************************************************************************
+    ** The real kernel configuration passes startup validation without waivers.
+    *******************************************************************************/
+   @Test
+   void durableJobsMetadataValidates()
+   {
+      QInstanceValidator validator = new QInstanceValidator();
+      DurableJobsMetaData.of(instance).validate(instance, validator);
+      assertThat(validator.getErrors()).isEmpty();
+   }
+
+   /*******************************************************************************
     ** Fail before registering anything when the kernel has not been enabled.
     *******************************************************************************/
    @Test
@@ -84,7 +97,7 @@ class JobsQBitProducerTest extends BaseJobsTest
    @Test
    void navigationWidgetsAndRecordSections()
    {
-      assertThat(instance.getTables()).hasSize(8);
+      assertThat(instance.getTables()).hasSize(11);
       assertThat(instance.getApp("jobs").getChildren()).extracting(child -> child.getName()).containsExactly(JOBS_JOB);
       assertThat(instance.getApp("jobs").getWidgets()).containsExactlyElementsOf(JobsQBitProducer.HOME_WIDGETS);
       assertThat(instance.getWidgets()).hasSize(12);
@@ -113,7 +126,8 @@ class JobsQBitProducerTest extends BaseJobsTest
    void schedulerAndAuditAreOptional() throws Exception
    {
       QInstance other = new QInstance();
-      JobsTablesStandIn.defineAll(other);
+      new DurableJobsMetaDataProvider().defineAll(other, "memory", null);
+      other.withSupplementalMetaData(new DurableJobsMetaData());
       JobsQBitConfig custom = new JobsQBitConfig().withAppName("backgroundJobs").withSchedulerName("scheduler")
          .withPurgeCronExpression("0 0 4 * * ?").withHomeRefreshSeconds(9).withRecordRefreshSeconds(8);
       new JobsQBitProducer().withQBitConfig(custom).produce(other);
@@ -211,18 +225,20 @@ class JobsQBitProducerTest extends BaseJobsTest
    }
 
    /*******************************************************************************
-    ** Older kernels need neither the outbox nor its join to register the app.
+    ** Hosts can omit the effects panel by removing its table or join.
     *******************************************************************************/
    @Test
    void effectsTableAndJoinAreOptional() throws Exception
    {
       QInstance withoutTable = new QInstance();
-      JobsTablesStandIn.defineAll(withoutTable);
+      new DurableJobsMetaDataProvider().defineAll(withoutTable, "memory", null);
+      withoutTable.withSupplementalMetaData(new DurableJobsMetaData());
       withoutTable.getTables().remove(JOBS_EFFECT);
       new JobsQBitProducer().produce(withoutTable);
       assertThat(withoutTable.getWidget("jobsJobEffects")).isNull();
       QInstance withoutJoin = new QInstance();
-      JobsTablesStandIn.defineAll(withoutJoin);
+      new DurableJobsMetaDataProvider().defineAll(withoutJoin, "memory", null);
+      withoutJoin.withSupplementalMetaData(new DurableJobsMetaData());
       withoutJoin.getJoins().remove(JobsCoreContract.childJoin(JOBS_EFFECT));
       new JobsQBitProducer().produce(withoutJoin);
       assertThat(withoutJoin.getWidget("jobsJobEffects")).isNull();
@@ -232,7 +248,7 @@ class JobsQBitProducerTest extends BaseJobsTest
     ** Outbox metadata carries the core field defaults, references and labels.
     *******************************************************************************/
    @Test
-   void effectsStandInContract() throws Exception
+   void effectsCoreContract() throws Exception
    {
       assertThat(instance.getTable(JOBS_EFFECT).getFields()).hasSize(26);
       assertThat(instance.getTable(JOBS_EFFECT).getField(JOB_ID).getPossibleValueSourceName()).isEqualTo(JOBS_JOB);
