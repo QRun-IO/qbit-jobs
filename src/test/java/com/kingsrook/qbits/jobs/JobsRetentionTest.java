@@ -48,17 +48,23 @@ import static com.kingsrook.qbits.jobs.JobsCoreContract.FAILED;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.ID;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.INPUT_STORAGE_REF;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_CHUNK;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_EFFECT;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_EVENT;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_JOB;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_ROW_ERROR;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_UPLOAD;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOB_ID;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.NEEDS_REVIEW;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.NEEDS_REVIEW_FIELD;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.PENDING;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.ROWS_FAILED;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.RUNNING;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.SENDING;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.SENT;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.SEQ;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.STATUS;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.TERMINAL_STATUSES;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.UNKNOWN;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -205,6 +211,68 @@ class JobsRetentionTest extends BaseJobsTest
    {
       assertThat(new JobsStorage().chunkStorageTable()).isNull();
       assertThat(run(new JobsPurgeFinishedStep())).extracting(ProcessSummaryLine::getCount).containsExactly(0, 0, 0);
+   }
+
+   /*******************************************************************************
+    ** Outstanding effects preserve every child and input; settled effects are paged away.
+    *******************************************************************************/
+   @Test
+   void effectsBlockPurgeUntilSettled() throws Exception
+   {
+      List<QRecord> kept = new ArrayList<>();
+      for(String status : List.of(PENDING, SENDING, UNKNOWN))
+      {
+         QRecord job = job(USER_A, COMPLETED, now.minus(40, ChronoUnit.DAYS));
+         clearFailures(job);
+         children(job);
+         effect(job, status, false);
+         kept.add(job);
+      }
+      QRecord review = job(USER_A, FAILED, now.minus(40, ChronoUnit.DAYS));
+      children(review);
+      effect(review, FAILED, true);
+      kept.add(review);
+      QRecord settled = job(USER_B, COMPLETED, now.minus(40, ChronoUnit.DAYS));
+      children(settled);
+      for(int i = 0; i < 205; i++)
+      {
+         effect(settled, i % 2 == 0 ? SENT : FAILED, false);
+      }
+      RecordingStorage storage = new RecordingStorage();
+      QSession caller = login("admin", true);
+      List<ProcessSummaryLine> summary = run(new JobsPurgeFinishedStep(storage));
+      assertThat(QContext.getQSession()).isSameAs(caller);
+      assertThat(summary).extracting(ProcessSummaryLine::getCount).containsExactly(1, 1, 1, 4);
+      assertThat(summary.getLast().getMessage()).isEqualTo("jobs kept: effects still outstanding");
+      JobsSecurity.ensureSessionKeys(caller);
+      assertThat(records(JOBS_JOB)).extracting(record -> record.getValue(ID)).containsExactlyElementsOf(kept.stream().map(record -> record.getValue(ID)).toList());
+      assertThat(records(JOBS_EFFECT)).hasSize(4);
+      for(String table : List.of(JOBS_CHUNK, JOBS_ROW_ERROR, JOBS_EVENT, JOBS_UPLOAD))
+      {
+         assertThat(records(table)).hasSize(4);
+      }
+      assertThat(records(JOBS_CHUNK)).allSatisfy(chunk -> assertThat(chunk.getValue(INPUT_STORAGE_REF)).isNotNull());
+      assertThat(storage.deleted).containsExactly("objects:chunk/" + settled.getValue(ID), "objects:input/" + settled.getValue(ID));
+      for(QRecord effect : records(JOBS_EFFECT))
+      {
+         new UpdateAction().execute(new UpdateInput().withTableName(JOBS_EFFECT).withRecord(new QRecord()
+            .withValue(ID, effect.getValue(ID)).withValue(STATUS, SENT).withValue(NEEDS_REVIEW_FIELD, false)));
+      }
+      assertThat(run(new JobsPurgeFinishedStep(storage))).extracting(ProcessSummaryLine::getCount).containsExactly(4, 4, 4);
+      assertThat(records(JOBS_JOB)).isEmpty();
+      assertThat(records(JOBS_EFFECT)).isEmpty();
+   }
+
+   /*******************************************************************************
+    ** Effects remain optional for retention against older cores.
+    *******************************************************************************/
+   @Test
+   void purgeWithoutEffectsTable() throws Exception
+   {
+      instance.getTables().remove(JOBS_EFFECT);
+      children(job(USER_A, FAILED, now.minus(40, ChronoUnit.DAYS)));
+      assertThat(run(new JobsPurgeFinishedStep(new RecordingStorage()))).extracting(ProcessSummaryLine::getCount).containsExactly(1, 1, 1);
+      assertThat(records(JOBS_JOB)).isEmpty();
    }
 
    /*******************************************************************************

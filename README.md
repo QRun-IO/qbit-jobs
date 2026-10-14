@@ -2,7 +2,7 @@
 
 The Jobs app for QQQ durable background jobs. Its home dashboard shows live progress, throughput,
 failures, workers and 30 days of history. It adds progress panels and child lists on the job record,
-declares the failure and stall alert types, and purges old jobs. The durable job kernel itself
+declares the failure, stall and effect-review alert types, and purges old jobs. The durable job kernel itself
 (tables, leases, plans, control actions, uploads) is in QQQ core. Design: [docs/DESIGN.md](docs/DESIGN.md),
 from QRun-IO/qqq `docs/specs/DURABLE-JOBS-AND-ASSISTED-BULK-LOAD.md`.
 
@@ -34,6 +34,7 @@ The tables are core's, prefixed `jobs_`. This qbit adds no tables.
 | `jobs_job` | One row per job: status, progress counters, owner, channel, inputs, outputs. **Nav entry.** |
 | `jobs_chunk` | The leased units of work, with attempts, checkpoints and per-chunk counts. Child list on the job. |
 | `jobs_row_error` | Which rows failed and why. Child list on the job; reportable. |
+| `jobs_effect` | Side effects outside the database (outbox): email, HTTP, S3, other databases; child list on the job. |
 | `jobs_event` | The job's timeline (launched, reclaimed, paused, completed and so on). Child list on the job. |
 | `jobs_worker` | The pods that run jobs. |
 | `jobs_upload` | Uploaded files (refs, owners, expiry). |
@@ -83,6 +84,9 @@ Production requires the kernel and the following core fixes (expected in RC.6):
 
 - `QRun-IO/qqq#1178`: the jobs tables, constants and security metadata (alert types
   `jobs.job-failed` and `jobs.job-stalled`).
+- `QRun-IO/qqq#1191`: the optional `jobs_effect` outbox and `jobs.effect-unresolved` alert.
+  Effects child lists require the table and its job join; effect statistics and retention
+  checks are enabled when the table exists. The app also works without that table.
 - `QRun-IO/qqq#1173`: `StorageAction.deleteObject`. Until present, object deletion logs
   once and is skipped. Job/child row retention still runs. Cleanup of inputs on retained
   clean jobs preserves their references when deletion is unavailable, allowing retry.
@@ -107,6 +111,10 @@ so the data carries no second title.
 Retention is admin/system-only and restores the original session even on failure.
 Its output contains standard process summary lines for jobs purged, chunk objects
 removed during purge, and input objects removed (uploads plus retained-job inputs).
+Jobs with effects outside SENT/FAILED, or with effects needing review, keep their rows
+and inputs. When any are skipped, the summary includes "N jobs kept: effects still outstanding".
+Needs attention shows each listed job's effect-review count; Live Progress adds an Effects
+group (Sent, Pending, Failed, Needs review) when the job has effects.
 
 
 ## License

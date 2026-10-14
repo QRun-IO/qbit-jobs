@@ -36,15 +36,25 @@ import com.kingsrook.qqq.backend.core.model.metadata.qbits.QBitMetaData;
 import com.kingsrook.qqq.backend.core.model.metadata.scheduleing.QScheduleMetaData;
 import com.kingsrook.qqq.backend.core.model.metadata.tables.QFieldSection;
 import org.junit.jupiter.api.Test;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.ALERT_EFFECT_UNRESOLVED;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.ALERT_JOB_FAILED;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.ALERT_JOB_STALLED;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.ATTEMPT;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.CHUNK_ID;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.HEARTBEAT_REAPER;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_CHUNK;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_EFFECT;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_EFFECT_STATUS;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_EFFECT_TYPE;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_EVENT;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_JOB;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_ROW_ERROR;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_UPLOAD;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_WORKER;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.JOB_ID;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.LEASE_VERSION;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.NEEDS_REVIEW_FIELD;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.RECONCILE_ATTEMPTS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -74,13 +84,13 @@ class JobsQBitProducerTest extends BaseJobsTest
    @Test
    void navigationWidgetsAndRecordSections()
    {
-      assertThat(instance.getTables()).hasSize(7);
+      assertThat(instance.getTables()).hasSize(8);
       assertThat(instance.getApp("jobs").getChildren()).extracting(child -> child.getName()).containsExactly(JOBS_JOB);
       assertThat(instance.getApp("jobs").getWidgets()).containsExactlyElementsOf(JobsQBitProducer.HOME_WIDGETS);
-      assertThat(instance.getWidgets()).hasSize(11);
+      assertThat(instance.getWidgets()).hasSize(12);
       assertThat(instance.getWidgets().values()).allSatisfy(widget -> assertThat(widget.getType()).isNotEqualTo(WidgetType.HTML.getType()));
       assertThat(instance.getTable(JOBS_JOB).getSections()).extracting(QFieldSection::getWidgetName)
-         .contains("jobsJobProgress", "jobsJobChunks", "jobsJobRowErrors", "jobsJobEvents", "jobsJobAudit");
+         .containsSubsequence("jobsJobProgress", "jobsJobChunks", "jobsJobRowErrors", "jobsJobEffects", "jobsJobEvents", "jobsJobAudit");
       for(String name : JobsQBitProducer.HOME_WIDGETS)
       {
          assertThat(instance.getWidget(name).getDefaultValues()).containsEntry("refreshSeconds", 5);
@@ -108,7 +118,7 @@ class JobsQBitProducerTest extends BaseJobsTest
          .withPurgeCronExpression("0 0 4 * * ?").withHomeRefreshSeconds(9).withRecordRefreshSeconds(8);
       new JobsQBitProducer().withQBitConfig(custom).produce(other);
       assertThat(other.getWidget("jobsJobAudit")).isNull();
-      assertThat(other.getWidgets()).hasSize(10);
+      assertThat(other.getWidgets()).hasSize(11);
       assertThat(other.getApp("backgroundJobs")).isNotNull();
       QScheduleMetaData schedule = other.getProcess(JobsQBitProducer.PURGE_PROCESS).getSchedule();
       assertThat(schedule.getSchedulerName()).isEqualTo("scheduler");
@@ -129,6 +139,11 @@ class JobsQBitProducerTest extends BaseJobsTest
       assertThat(failed.getSubjectTableName()).isEqualTo(JOBS_JOB);
       assertThat(failed.getHowToFix()).isNotBlank();
       assertThat(QAlertTypeMetaData.of(instance, ALERT_JOB_STALLED).getDefaultSeverity()).isEqualTo(AlertSeverity.WARNING);
+      QAlertTypeMetaData effect = QAlertTypeMetaData.of(instance, ALERT_EFFECT_UNRESOLVED);
+      assertThat(effect.getLabel()).isEqualTo("Job effect needs review");
+      assertThat(effect.getDefaultSeverity()).isEqualTo(AlertSeverity.WARNING);
+      assertThat(effect.getSubjectTableName()).isEqualTo(JOBS_JOB);
+      assertThat(effect.getHowToFix()).isNotBlank();
       QAlertTypeMetaData reaper = QAlertTypeMetaData.of(instance, HEARTBEAT_REAPER);
       assertThat(reaper.getLabel()).isEqualTo("Job reaper stopped");
       assertThat(reaper.getDefaultMonitors()).singleElement().satisfies(monitor ->
@@ -177,7 +192,7 @@ class JobsQBitProducerTest extends BaseJobsTest
    {
       assertThat(JobsIntegrations.esbTableNames()).containsExactly(JOBS_JOB);
       assertThat(JobsIntegrations.quickSearchTables()).containsExactly(JOBS_JOB);
-      assertThat(JobsIntegrations.dataAnalysisTables()).containsExactly(JOBS_JOB, JOBS_CHUNK, JOBS_ROW_ERROR, JOBS_EVENT, JOBS_WORKER);
+      assertThat(JobsIntegrations.dataAnalysisTables()).containsExactly(JOBS_JOB, JOBS_CHUNK, JOBS_ROW_ERROR, JOBS_EFFECT, JOBS_EVENT, JOBS_WORKER);
    }
 
    /*******************************************************************************
@@ -189,9 +204,47 @@ class JobsQBitProducerTest extends BaseJobsTest
       AlertsInstanceMetaData alerts = new AlertsInstanceMetaData();
       alerts.withAlertType(QAlertTypeMetaData.of(instance, ALERT_JOB_FAILED));
       alerts.withAlertType(QAlertTypeMetaData.of(instance, ALERT_JOB_STALLED));
+      alerts.withAlertType(QAlertTypeMetaData.of(instance, ALERT_EFFECT_UNRESOLVED));
       QInstanceValidator validator = new QInstanceValidator();
       alerts.validate(instance, validator);
       assertThat(validator.getErrors()).isEmpty();
    }
 
+   /*******************************************************************************
+    ** Older kernels need neither the outbox nor its join to register the app.
+    *******************************************************************************/
+   @Test
+   void effectsTableAndJoinAreOptional() throws Exception
+   {
+      QInstance withoutTable = new QInstance();
+      JobsTablesStandIn.defineAll(withoutTable);
+      withoutTable.getTables().remove(JOBS_EFFECT);
+      new JobsQBitProducer().produce(withoutTable);
+      assertThat(withoutTable.getWidget("jobsJobEffects")).isNull();
+      QInstance withoutJoin = new QInstance();
+      JobsTablesStandIn.defineAll(withoutJoin);
+      withoutJoin.getJoins().remove(JobsCoreContract.childJoin(JOBS_EFFECT));
+      new JobsQBitProducer().produce(withoutJoin);
+      assertThat(withoutJoin.getWidget("jobsJobEffects")).isNull();
+   }
+
+   /*******************************************************************************
+    ** Outbox metadata carries the core field defaults, references and labels.
+    *******************************************************************************/
+   @Test
+   void effectsStandInContract() throws Exception
+   {
+      assertThat(instance.getTable(JOBS_EFFECT).getFields()).hasSize(26);
+      assertThat(instance.getTable(JOBS_EFFECT).getField(JOB_ID).getPossibleValueSourceName()).isEqualTo(JOBS_JOB);
+      assertThat(instance.getTable(JOBS_EFFECT).getField(CHUNK_ID).getPossibleValueSourceName()).isEqualTo(JOBS_CHUNK);
+      assertThat(instance.getTable(JOBS_EFFECT).getField(NEEDS_REVIEW_FIELD).getDefaultValue()).isEqualTo(false);
+      for(String field : List.of(ATTEMPT, RECONCILE_ATTEMPTS, LEASE_VERSION))
+      {
+         assertThat(instance.getTable(JOBS_EFFECT).getField(field).getDefaultValue()).isEqualTo(0);
+      }
+      assertThat(instance.getPossibleValueSource(JOBS_EFFECT_STATUS).getEnumValues()).extracting(value -> value.getLabel())
+         .containsExactly("Pending", "Sending", "Sent", "Failed", "Unknown");
+      assertThat(instance.getPossibleValueSource(JOBS_EFFECT_TYPE).getEnumValues()).extracting(value -> value.getLabel())
+         .containsExactly("Local Transaction", "Idempotent External", "Non-Idempotent External");
+   }
 }

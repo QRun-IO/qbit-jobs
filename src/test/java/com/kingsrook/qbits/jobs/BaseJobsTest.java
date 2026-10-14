@@ -27,6 +27,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import com.kingsrook.qqq.backend.core.actions.dashboard.RenderWidgetAction;
 import com.kingsrook.qqq.backend.core.actions.tables.InsertAction;
 import com.kingsrook.qqq.backend.core.actions.tables.QueryAction;
@@ -64,14 +65,19 @@ import static com.kingsrook.qbits.jobs.JobsCoreContract.COMPLETED_WITH_ERRORS;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.DETAIL;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.DONE;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.DRAINING;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.EFFECT_NAME;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.EFFECT_TYPE;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.ERROR_MESSAGE;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.FAILED;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.FINISHED_AT;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.HEARTBEAT_AT;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.ID;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.IDEMPOTENCY_KEY;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.IDEMPOTENT_EXTERNAL;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.INPUT_STORAGE_REF;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_ADMIN;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_CHUNK;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_EFFECT;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_EVENT;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_JOB;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_ROW_ERROR;
@@ -82,6 +88,7 @@ import static com.kingsrook.qbits.jobs.JobsCoreContract.LABEL;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.LAST_PROGRESS_AT;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.MESSAGE;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.NEEDS_REVIEW;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.NEEDS_REVIEW_FIELD;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.PAUSED;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.PAUSING;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.PLANNING;
@@ -200,6 +207,16 @@ public class BaseJobsTest
       insert(JOBS_UPLOAD, new QRecord().withValue(JOB_ID, id).withValue(USER_ID, job.getValue(USER_ID))
          .withValue(REF, "upload/" + id).withValue(STORAGE_TABLE_NAME, "objects").withValue(STORAGE_REFERENCE, "input/" + id));
       insert(AUDIT, new QRecord().withValue(MESSAGE, "job:" + id + "/chunk:1 changed a row"));
+   }
+
+   /*******************************************************************************
+    ** An outbox entry with a unique idempotency key, independent of other fixtures.
+    *******************************************************************************/
+   protected QRecord effect(QRecord job, String status, boolean needsReview) throws QException
+   {
+      return (insert(JOBS_EFFECT, new QRecord().withValue(JOB_ID, job.getValue(ID)).withValue(EFFECT_NAME, "Send notification")
+         .withValue(STATUS, status).withValue(NEEDS_REVIEW_FIELD, needsReview).withValue(EFFECT_TYPE, IDEMPOTENT_EXTERNAL)
+         .withValue(IDEMPOTENCY_KEY, UUID.randomUUID().toString())));
    }
 
    /*******************************************************************************

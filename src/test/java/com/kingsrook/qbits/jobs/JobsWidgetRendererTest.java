@@ -58,11 +58,14 @@ import static com.kingsrook.qbits.jobs.JobsCoreContract.FAILED;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.FINISHED_AT;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.ID;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_CHUNK;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_EFFECT;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_EVENT;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_JOB;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_USER;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOB_ID;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.LAST_PROGRESS_AT;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.NEEDS_REVIEW;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.PENDING;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.PRIORITY;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.PROCESS_NAME;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.QUEUED;
@@ -70,11 +73,14 @@ import static com.kingsrook.qbits.jobs.JobsCoreContract.ROWS_FAILED;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.ROWS_IN;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.ROWS_TOTAL;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.RUNNING;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.SENDING;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.SENT;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.SEQ;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.STARTED_AT;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.STATUS;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.STATUS_REASON;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.TYPE;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.UNKNOWN;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -412,6 +418,81 @@ class JobsWidgetRendererTest extends BaseJobsTest
       assertThat(((TableData) render("jobsHomeWorkers", null)).getNoRowsFoundHTML()).isEqualTo("No workers have registered");
       assertThatThrownBy(() -> new JobsWidgetRenderer().render(new RenderWidgetInput().withWidgetMetaData(new QWidgetMetaData().withName("unknown"))))
          .hasMessageContaining("Unknown Jobs widget");
+   }
+
+   /*******************************************************************************
+    ** Review counts belong only to listed jobs; core controls attention eligibility.
+    *******************************************************************************/
+   @Test
+   void attentionEffectsAndOwnerIsolation() throws Exception
+   {
+      QRecord review = job(USER_A, NEEDS_REVIEW, now);
+      effect(review, UNKNOWN, true);
+      effect(review, UNKNOWN, true);
+      effect(review, PENDING, false);
+      effect(job(USER_A, RUNNING, now), UNKNOWN, true);
+      QRecord other = job(USER_B, FAILED, now.minusSeconds(60));
+      effect(other, UNKNOWN, true);
+      QSession viewer = login(USER_A, false);
+      TableData attention = (TableData) render("jobsHomeAttention", null);
+      assertThat(attention.getRows()).hasSize(1);
+      assertThat(texts((CompositeWidgetData) attention.getRows().getFirst().get(JobsWidgetRenderer.STATUS_CELL))).contains("2 effects need review");
+      assertThat(QContext.getQSession()).isSameAs(viewer);
+      login(USER_B, false);
+      attention = (TableData) render("jobsHomeAttention", null);
+      assertThat(attention.getRows()).hasSize(1);
+      assertThat(texts((CompositeWidgetData) attention.getRows().getFirst().get(JobsWidgetRenderer.STATUS_CELL)))
+         .contains("1 effects need review").doesNotContain("2 effects need review");
+      assertThat(records(JOBS_EFFECT)).hasSize(1).allSatisfy(record -> assertThat(record.getValue(JOB_ID)).isEqualTo(other.getValue(ID)));
+   }
+
+   /*******************************************************************************
+    ** Effects use disjoint statistics and the secured core child renderer.
+    *******************************************************************************/
+   @Test
+   void effectsProgressAndChildList() throws Exception
+   {
+      QRecord job = job(USER_A, NEEDS_REVIEW, now);
+      for(String status : List.of(SENT, SENT, PENDING, SENDING, UNKNOWN, FAILED))
+      {
+         effect(job, status, false);
+      }
+      QRecord firstReview = effect(job, UNKNOWN, true);
+      effect(job, PENDING, true);
+      effect(job(USER_B, RUNNING, null), SENT, false);
+      String id = job.getValueString(ID);
+      QSession viewer = login(USER_A, false);
+      MultiStatisticsData progress = (MultiStatisticsData) render("jobsJobProgress", id);
+      assertThat(progress.getStatisticsGroupData()).extracting(MultiStatisticsData.StatisticsGroupData::getHeader)
+         .containsExactly("Rows", "Chunks", "Speed", "Effects");
+      assertThat(groupStat(progress, "Effects", "Sent")).isEqualTo(2);
+      assertThat(groupStat(progress, "Effects", "Pending")).isEqualTo(3);
+      assertThat(groupStat(progress, "Effects", "Failed")).isEqualTo(1);
+      assertThat(groupStat(progress, "Effects", "Needs review")).isEqualTo(2);
+      ChildRecordListData effects = (ChildRecordListData) render("jobsJobEffects", id);
+      assertThat(effects.getTotalRows()).isEqualTo(8);
+      assertThat(effects.getQueryOutput().getRecords()).extracting(record -> record.getValueInteger(ID)).isSorted();
+      assertThat(effects.getQueryOutput().getRecords()).extracting(record -> record.getValue(ID)).contains(firstReview.getValue(ID));
+      assertThat(QContext.getQSession()).isSameAs(viewer);
+      login(USER_B, false);
+      assertThat(((MultiStatisticsData) render("jobsJobProgress", id)).getStatisticsGroupData()).isEmpty();
+      assertThatThrownBy(() -> render("jobsJobEffects", id)).isInstanceOf(QException.class);
+      login("admin", true);
+      assertThat(((ChildRecordListData) render("jobsJobEffects", id)).getTotalRows()).isEqualTo(8);
+   }
+
+   /*******************************************************************************
+    ** RC.5 instances still render attention and progress without an effects table.
+    *******************************************************************************/
+   @Test
+   void widgetsWithoutEffectsTable() throws Exception
+   {
+      QRecord job = job(USER_A, FAILED, now);
+      instance.getTables().remove(JOBS_EFFECT);
+      login(USER_A, false);
+      assertThat(((TableData) render("jobsHomeAttention", null)).getRows()).hasSize(1);
+      assertThat(((MultiStatisticsData) render("jobsJobProgress", job.getValueString(ID))).getStatisticsGroupData())
+         .extracting(MultiStatisticsData.StatisticsGroupData::getHeader).containsExactly("Rows", "Chunks", "Speed");
    }
 
    /*******************************************************************************

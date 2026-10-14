@@ -132,7 +132,34 @@ public final class JobsCoreContract
    public static final String NEEDS_REVIEW = "NEEDS_REVIEW";
    public static final String DONE = "DONE";
 
-   public static final List<String> DATA_TABLES = List.of(JOBS_JOB, JOBS_CHUNK, JOBS_ROW_ERROR, JOBS_EVENT, JOBS_WORKER);
+   // STAND-IN(core=QRun-IO/qqq#1191, removeBy=RC.6): transactional outbox contract.
+   public static final String JOBS_EFFECT = "jobs_effect";
+   public static final String JOBS_EFFECT_STATUS = "jobs_effect_status";
+   public static final String JOBS_EFFECT_TYPE = "jobs_effect_type";
+   public static final String ALERT_EFFECT_UNRESOLVED = "jobs.effect-unresolved";
+   public static final String EFFECT_NAME = "effectName";
+   public static final String NEEDS_REVIEW_FIELD = "needsReview";
+   public static final String ROW_KEY = "rowKey";
+   public static final String TARGET_NAME = "targetName";
+   public static final String EFFECT_TYPE = "effectType";
+   public static final String CHUNK_SEQ = "chunkSeq";
+   public static final String IDEMPOTENCY_KEY = "idempotencyKey";
+   public static final String PAYLOAD_JSON = "payloadJson";
+   public static final String PAYLOAD_REF = "payloadRef";
+   public static final String RECONCILE_ATTEMPTS = "reconcileAttempts";
+   public static final String NEXT_ATTEMPT_AT = "nextAttemptAt";
+   public static final String PROVIDER_REF = "providerRef";
+   public static final String LAST_ERROR = "lastError";
+   public static final String SENT_AT = "sentAt";
+   public static final String PENDING = "PENDING";
+   public static final String SENDING = "SENDING";
+   public static final String SENT = "SENT";
+   public static final String UNKNOWN = "UNKNOWN";
+   public static final String LOCAL_TX = "LOCAL_TX";
+   public static final String IDEMPOTENT_EXTERNAL = "IDEMPOTENT_EXTERNAL";
+   public static final String NON_IDEMPOTENT_EXTERNAL = "NON_IDEMPOTENT_EXTERNAL";
+
+   public static final List<String> DATA_TABLES = List.of(JOBS_JOB, JOBS_CHUNK, JOBS_ROW_ERROR, JOBS_EFFECT, JOBS_EVENT, JOBS_WORKER);
    public static final List<String> ALL_TABLES = List.of(JOBS_JOB, JOBS_CHUNK, JOBS_ROW_ERROR, JOBS_EVENT, JOBS_WORKER, JOBS_UPLOAD);
    public static final List<String> RUNNING_STATUSES = List.of(RUNNING, PAUSING, CANCELLING, PLANNING);
    public static final List<String> QUEUED_STATUSES = List.of(QUEUED, AWAITING_CONFIRMATION);
