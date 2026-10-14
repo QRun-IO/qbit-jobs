@@ -81,7 +81,7 @@ public class JobsStorage
       {
          if(WARNED.compareAndSet(false, true))
          {
-            LOG.warn("StorageAction.deleteObject is unavailable in this core release; skipping jobs object deletion until RC.6");
+            LOG.warn("StorageAction.deleteObject is unavailable in this core release; skipping jobs object deletion until RC.7");
          }
          return (false);
       }

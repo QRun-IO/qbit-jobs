@@ -27,7 +27,7 @@ import com.kingsrook.qqq.backend.core.model.metadata.joins.QJoinMetaData;
 
 
 /*******************************************************************************
- ** STAND-IN(core=QRun-IO/qqq#1178, removeBy=RC.7): mirrors core DurableJobsTables and friends; switch to core's constants when RC.6 is released.
+ ** STAND-IN(core=QRun-IO/qqq#1178, removeBy=RC.7): mirrors core DurableJobsTables and friends; switch to core's constants when RC.7 is released.
  *******************************************************************************/
 public final class JobsCoreContract
 {

@@ -90,7 +90,7 @@ public class JobsPurgeFinishedStep implements BackendStep
    }
 
    /*******************************************************************************
-    ** Storage seam for testing RC.6 deletion semantics against RC.5.
+    ** Storage seam for testing RC.7 deletion semantics against RC.5.
     *******************************************************************************/
    public JobsPurgeFinishedStep(JobsStorage storage)
    {

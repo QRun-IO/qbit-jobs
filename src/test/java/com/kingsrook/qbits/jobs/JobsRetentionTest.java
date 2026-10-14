@@ -296,7 +296,7 @@ class JobsRetentionTest extends BaseJobsTest
    }
 
    /*******************************************************************************
-    ** Test storage models successful RC.6 object deletion, without using disk.
+    ** Test storage models successful RC.7 object deletion, without using disk.
     *******************************************************************************/
    private static class RecordingStorage extends JobsStorage
    {
