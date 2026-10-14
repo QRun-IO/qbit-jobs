@@ -80,7 +80,7 @@ mvn install -DskipTests -Drevision=4.1.0-JOBS-SNAPSHOT
 ## Compatibility and display
 
 The default build uses released core **4.1.0-RC.5**, which has no durable jobs kernel.
-Production requires the kernel and the following core fixes (expected in RC.6):
+Production requires the kernel and the following core fixes (expected in RC.7; RC.6 shipped without them):
 
 - `QRun-IO/qqq#1178`: the jobs tables, constants and security metadata (alert types
   `jobs.job-failed` and `jobs.job-stalled`).

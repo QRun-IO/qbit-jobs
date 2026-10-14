@@ -84,8 +84,8 @@ these to qqq-esb, qbit-quick-search and qbit-data-analysis.
 The qbit builds against the released QQQ RC through the default `qqq-snapshot` profile. Until the
 kernel ships in an RC, the core names it needs (table, field and process names, and the jobs session
 keys) are mirrored in `JobsCoreContract`, tagged
-`STAND-IN(core=QRun-IO/qqq#1178, removeBy=RC.6)`. When RC.6 is released, those constants switch to
+`STAND-IN(core=QRun-IO/qqq#1178, removeBy=RC.7)`. When RC.7 is released, those constants switch to
 core's `DurableJobsTables`, and `JobsCoreContract` and the test-only table mirror are deleted.
-The optional outbox additions carry `STAND-IN(core=QRun-IO/qqq#1191, removeBy=RC.6)`.
+The optional outbox additions carry `STAND-IN(core=QRun-IO/qqq#1191, removeBy=RC.7)`.
 The demo server (`-Pdemo`, under `src/demo/java`) runs against a locally installed 4.1.0-SNAPSHOT of
 the kernel branch. It is how the screenshots are taken.

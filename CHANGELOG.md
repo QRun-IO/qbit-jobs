@@ -12,7 +12,7 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `jobs.effect-unresolved` warning alert for effects requiring outcome review.
 - Retention deletes settled effects and preserves jobs and inputs with outstanding
   effects, reporting the number kept in the process summary.
-- RC.6 outbox contract/test stand-ins, Postgres table and indexes, and coverage for
+- RC.7 outbox contract/test stand-ins, Postgres table and indexes, and coverage for
   effect counts, owner isolation, retention and cores without the effects table.
 
 - Jobs app with six typed home widgets for live progress, throughput, attention,

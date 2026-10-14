@@ -27,7 +27,7 @@ import com.kingsrook.qqq.backend.core.model.metadata.joins.QJoinMetaData;
 
 
 /*******************************************************************************
- ** STAND-IN(core=QRun-IO/qqq#1178, removeBy=RC.6): mirrors core DurableJobsTables and friends; switch to core's constants when RC.6 is released.
+ ** STAND-IN(core=QRun-IO/qqq#1178, removeBy=RC.7): mirrors core DurableJobsTables and friends; switch to core's constants when RC.7 is released.
  *******************************************************************************/
 public final class JobsCoreContract
 {
@@ -132,7 +132,7 @@ public final class JobsCoreContract
    public static final String NEEDS_REVIEW = "NEEDS_REVIEW";
    public static final String DONE = "DONE";
 
-   // STAND-IN(core=QRun-IO/qqq#1191, removeBy=RC.6): transactional outbox contract.
+   // STAND-IN(core=QRun-IO/qqq#1191, removeBy=RC.7): transactional outbox contract.
    public static final String JOBS_EFFECT = "jobs_effect";
    public static final String JOBS_EFFECT_STATUS = "jobs_effect_status";
    public static final String JOBS_EFFECT_TYPE = "jobs_effect_type";

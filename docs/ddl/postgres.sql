@@ -96,7 +96,7 @@ CREATE TABLE jobs_row_error
 
 CREATE INDEX jobs_row_error_job_idx ON jobs_row_error (job_id);
 
--- STAND-IN(core=QRun-IO/qqq#1191, removeBy=RC.6): transactional outbox.
+-- STAND-IN(core=QRun-IO/qqq#1191, removeBy=RC.7): transactional outbox.
 CREATE TABLE jobs_effect
 (
    id                 SERIAL PRIMARY KEY,

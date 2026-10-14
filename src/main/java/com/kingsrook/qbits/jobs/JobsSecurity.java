@@ -31,7 +31,7 @@ import com.kingsrook.qqq.backend.core.utils.StringUtils;
 
 
 /*******************************************************************************
- ** STAND-IN(core=QRun-IO/qqq#1178, removeBy=RC.6): copy of core session security.
+ ** STAND-IN(core=QRun-IO/qqq#1178, removeBy=RC.7): copy of core session security.
  ** Puts the durable-jobs security keys into a session: jobs_user = the user's id,
  ** plus jobs_user_all_access for sessions holding the jobs_admin permission.
  **
