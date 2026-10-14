@@ -53,6 +53,24 @@ public final class JobsFormat
 
 
    /*******************************************************************************
+    ** Binary byte units, with one decimal place above bytes.
+    *******************************************************************************/
+   public static String bytes(long value)
+   {
+      double amount = Math.max(0, value);
+      String[] units = {"B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB"};
+      int unit = 0;
+      while(amount >= 1024 && unit < units.length - 1)
+      {
+         amount /= 1024;
+         unit++;
+      }
+      return (unit == 0 ? count((long) amount) + " B" : String.format(Locale.US, "%.1f %s", amount, units[unit]));
+   }
+
+
+
+   /*******************************************************************************
     ** A count with thousands separators.
     *******************************************************************************/
    public static String count(long value)

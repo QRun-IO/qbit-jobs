@@ -22,6 +22,7 @@
 package com.kingsrook.qbits.jobs.widgets;
 
 
+import java.io.IOException;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.net.URLEncoder;
@@ -43,6 +44,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.kingsrook.qbits.jobs.JobsSecurity;
 import com.kingsrook.qqq.backend.core.actions.dashboard.widgets.AbstractWidgetRenderer;
 import com.kingsrook.qqq.backend.core.actions.tables.CountAction;
@@ -73,14 +75,18 @@ import com.kingsrook.qqq.backend.core.model.metadata.processes.QProcessMetaData;
 import com.kingsrook.qqq.backend.core.utils.JsonUtils;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.ATTENTION_STATUSES;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.AUDIT;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.BYTES_DONE;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.BYTES_TOTAL;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.CHUNKS_DONE;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.CHUNKS_FAILED;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.CHUNKS_TOTAL;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.COMPLETED;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.COMPLETED_WITH_ERRORS;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.CURRENT_PHASE;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.DONE;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.DRAINING;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.ERROR_MESSAGE;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.ETA_SECONDS;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.FAILED;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.FINISHED_AT;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.HEARTBEAT_AT;
@@ -93,12 +99,16 @@ import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_WORKER;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOB_ID;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.LABEL;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.LAST_PROGRESS_AT;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.LOG_DROPPED;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.MESSAGE;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.NEEDS_REVIEW_FIELD;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.PENDING;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.PERCENT_DONE;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.POD_ID;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.PRIORITY;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.PROCESS_NAME;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.PROGRESS_JSON;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.PROGRESS_MESSAGE;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.QUEUED_AT;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.QUEUED_STATUSES;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.ROWS_DONE;
@@ -305,6 +315,13 @@ public class JobsWidgetRenderer extends AbstractWidgetRenderer
             progress.withBlock(text("Unknown total", null, null));
          }
          progress.withBlock(small(rowText + " rows"));
+         for(String detail : progressDetails(job))
+         {
+            progress.withBlock(small(detail));
+         }
+         row.put("Phase", phaseLabel(job));
+         row.put("Message", job.getValueString(PROGRESS_MESSAGE));
+         row.put("Bytes", bytes(job));
 
          row.put(JOB_CELL, jobCell(job, null));
          row.put(PROGRESS_CELL, progress);
@@ -498,7 +515,7 @@ public class JobsWidgetRenderer extends AbstractWidgetRenderer
          rowStats.add(statistic("Total", number(job, ROWS_TOTAL), null));
       }
       MultiStatisticsData.StatisticsGroupData rows = new MultiStatisticsData.StatisticsGroupData().withHeader("Rows")
-         .withSubheader(job.getValue(ROWS_TOTAL) == null ? "Total not known yet" : percent + " done").withStatisticList(rowStats);
+         .withSubheader(percentValue(job) == null ? "Total not known yet" : percent + " done").withStatisticList(rowStats);
 
       List<MultiStatisticsData.StatisticsGroupData.Statistic> chunkStats = new ArrayList<>();
       chunkStats.add(statistic("Done", number(job, CHUNKS_DONE), null));
@@ -514,7 +531,7 @@ public class JobsWidgetRenderer extends AbstractWidgetRenderer
       {
          speedNote = statusLabel(status) + " " + JobsFormat.time(job.getValueInstant(FINISHED_AT), now);
       }
-      else if(RUNNING_STATUSES.contains(status))
+      else if(job.getValue(ETA_SECONDS) != null || RUNNING_STATUSES.contains(status))
       {
          speedNote = "ETA " + eta(job, now);
       }
@@ -525,6 +542,17 @@ public class JobsWidgetRenderer extends AbstractWidgetRenderer
       MultiStatisticsData.StatisticsGroupData speed = new MultiStatisticsData.StatisticsGroupData().withHeader("Speed").withSubheader(speedNote)
          .withStatisticList(List.of(statistic("Rows per minute", Math.round(rate(job, now)), null)));
       List<MultiStatisticsData.StatisticsGroupData> groups = new ArrayList<>(List.of(rows, chunks, speed));
+      List<String> details = progressDetails(job);
+      if(!details.isEmpty())
+      {
+         groups.addFirst(new MultiStatisticsData.StatisticsGroupData().withHeader("Progress")
+            .withSubheader(String.join(" | ", details)).withStatisticList(List.of()));
+      }
+      if(number(job, LOG_DROPPED) > 0)
+      {
+         groups.add(new MultiStatisticsData.StatisticsGroupData().withHeader("Log")
+            .withSubheader(JobsFormat.count(number(job, LOG_DROPPED)) + " earlier lines not kept").withStatisticList(List.of()));
+      }
       if(QContext.getQInstance().getTable(JOBS_EFFECT) != null)
       {
          List<QRecord> effects = query(JOBS_EFFECT, new QQueryFilter().withCriteria(JOB_ID, QCriteriaOperator.EQUALS, job.getValue(ID)));
@@ -760,10 +788,69 @@ public class JobsWidgetRenderer extends AbstractWidgetRenderer
 
 
    /*******************************************************************************
-    ** Percent done from rows, else from chunks; null when neither total is known.
+    ** Resolve the phase label from the optional snapshot; old or malformed data
+    ** still displays the reported phase name.
+    *******************************************************************************/
+   private static String phaseLabel(QRecord job)
+   {
+      String current = job.getValueString(CURRENT_PHASE);
+      String json = job.getValueString(PROGRESS_JSON);
+      if(current != null && json != null)
+      {
+         try
+         {
+            JsonNode snapshot = JsonUtils.toObject(json, JsonNode.class);
+            for(JsonNode phase : snapshot == null ? List.<JsonNode>of() : snapshot.path("phases"))
+            {
+               if(current.equals(phase.path("name").asText()) && !phase.path("label").asText().isBlank())
+               {
+                  return (phase.path("label").asText());
+               }
+            }
+         }
+         catch(IOException ignored)
+         {
+            // The denormalized progress remains usable without a valid snapshot.
+         }
+      }
+      return (current);
+   }
+
+   /*******************************************************************************
+    ** Optional byte counts, retaining unknown totals rather than inventing zero.
+    *******************************************************************************/
+   private static String bytes(QRecord job)
+   {
+      String done = job.getValue(BYTES_DONE) == null ? null : JobsFormat.bytes(number(job, BYTES_DONE));
+      String total = job.getValue(BYTES_TOTAL) == null ? null : JobsFormat.bytes(number(job, BYTES_TOTAL));
+      return (total == null ? done : done == null ? total + " total" : done + " / " + total);
+   }
+
+   /*******************************************************************************
+    ** Plain typed text shared by the home and record progress views.
+    *******************************************************************************/
+   private static List<String> progressDetails(QRecord job)
+   {
+      List<String> details = new ArrayList<>();
+      for(String detail : new String[] {phaseLabel(job), job.getValueString(PROGRESS_MESSAGE), bytes(job)})
+      {
+         if(detail != null && !detail.isBlank())
+         {
+            details.add(detail);
+         }
+      }
+      return (details);
+   }
+
+   /*******************************************************************************
+    ** Explicit percent, else rows then chunks; null when no total is known.
     *******************************************************************************/
    private static BigDecimal percentValue(QRecord job)
    {
+      if(job.getValue(PERCENT_DONE) != null)
+      {
+         return (BigDecimal.valueOf(Math.max(0, Math.min(100, number(job, PERCENT_DONE)))));
+      }
       long total = number(job, ROWS_TOTAL);
       long done  = number(job, ROWS_DONE);
       if(total <= 0)
@@ -805,6 +892,10 @@ public class JobsWidgetRenderer extends AbstractWidgetRenderer
     *******************************************************************************/
    private static String eta(QRecord job, Instant now)
    {
+      if(job.getValue(ETA_SECONDS) != null)
+      {
+         return ("in " + JobsFormat.span(number(job, ETA_SECONDS)));
+      }
       double rate = rate(job, now);
       if(!RUNNING_STATUSES.contains(job.getValueString(STATUS)) || rate <= 0 || job.getValue(ROWS_TOTAL) == null)
       {

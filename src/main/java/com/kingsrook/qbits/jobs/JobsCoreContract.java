@@ -31,6 +31,21 @@ import com.kingsrook.qqq.backend.core.model.metadata.joins.QJoinMetaData;
  *******************************************************************************/
 public final class JobsCoreContract
 {
+   // Optional progress and log contract (core 4.1.0-RC.8).
+   public static final String JOBS_LOG = "jobs_log";
+   public static final String CURRENT_PHASE = "currentPhase";
+   public static final String PERCENT_DONE = "percentDone";
+   public static final String PROGRESS_MESSAGE = "progressMessage";
+   public static final String BYTES_DONE = "bytesDone";
+   public static final String BYTES_TOTAL = "bytesTotal";
+   public static final String ETA_SECONDS = "etaSeconds";
+   public static final String LOG_SEQ = "logSeq";
+   public static final String LOG_DROPPED = "logDropped";
+   public static final String PROGRESS_JSON = "progressJson";
+   public static final String LEVEL = "level";
+   public static final String LOGGED_AT = "loggedAt";
+   public static final String PHASE = "phase";
+
    public static final String JOBS_JOB = "jobs_job";
    public static final String JOBS_CHUNK = "jobs_chunk";
    public static final String JOBS_ROW_ERROR = "jobs_row_error";

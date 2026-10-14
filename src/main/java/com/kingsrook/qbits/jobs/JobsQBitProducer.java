@@ -66,7 +66,12 @@ import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_CHUNK;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_EFFECT;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_EVENT;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_JOB;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_LOG;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_ROW_ERROR;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.LEVEL;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.LOGGED_AT;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.MESSAGE;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.PHASE;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.ROW_NUMBER;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.SEQ;
 
@@ -162,10 +167,20 @@ public class JobsQBitProducer implements QBitMetaDataProducer<JobsQBitConfig>
       QWidgetMetaData workers = registerWidget(instance, "jobsHomeWorkers", "Workers", WidgetType.TABLE, qBitConfig.getHomeRefreshSeconds());
       workers.withPermissionRules(adminRules());
       registerWidget(instance, "jobsHomeHistory", "Job history", WidgetType.STACKED_BAR_CHART, qBitConfig.getHomeRefreshSeconds());
-      instance.addApp(new QAppMetaData().withName(qBitConfig.getAppName()).withLabel("Jobs").withIcon(new QIcon("pending_actions"))
-         .withChild(instance.getTable(JOBS_JOB)).withWidgets(new ArrayList<>(HOME_WIDGETS)));
+      QAppMetaData app = new QAppMetaData().withName(qBitConfig.getAppName()).withLabel("Jobs").withIcon(new QIcon("pending_actions"))
+         .withChild(instance.getTable(JOBS_JOB)).withWidgets(new ArrayList<>(HOME_WIDGETS));
+      app.setParentAppName(qBitConfig.getParentAppName());
+      instance.addApp(app);
+      if(qBitConfig.getParentAppName() != null)
+      {
+         instance.getApp(qBitConfig.getParentAppName()).withChild(app);
+      }
       registerWidget(instance, "jobsJobProgress", "Live Progress", WidgetType.MULTI_STATISTICS, qBitConfig.getRecordRefreshSeconds());
       addRecordSection(instance, "jobsJobProgress", "Live Progress");
+      if(instance.getTable(JOBS_LOG) != null && instance.getJoin(JobsCoreContract.childJoin(JOBS_LOG)) != null)
+      {
+         child(instance, JOBS_LOG, "jobsJobLog", "Log", ID, false);
+      }
       child(instance, JOBS_CHUNK, "jobsJobChunks", "Chunks", SEQ, true);
       child(instance, JOBS_ROW_ERROR, "jobsJobRowErrors", "Row Errors", ROW_NUMBER, true);
       if(instance.getTable(JOBS_EFFECT) != null && instance.getJoin(JobsCoreContract.childJoin(JOBS_EFFECT)) != null)
@@ -203,6 +218,10 @@ public class JobsQBitProducer implements QBitMetaDataProducer<JobsQBitConfig>
          .withOrderBys(List.of(new QFilterOrderBy(order, ascending))).withMaxRows(25).getWidgetMetaData()
          .withName(name).withLabel(label).withGridColumns(12).withCodeReference(new QCodeReference(JobsChildRecordListRenderer.class))
          .withDefaultValue("refreshSeconds", qBitConfig.getRecordRefreshSeconds());
+      if(JOBS_LOG.equals(table))
+      {
+         widget.withDefaultValue(ChildRecordListRenderer.KEY_ONLY_INCLUDE_FIELD_NAMES, new ArrayList<>(List.of(LEVEL, LOGGED_AT, PHASE, MESSAGE)));
+      }
       instance.addWidget(widget);
       addRecordSection(instance, name, label);
    }

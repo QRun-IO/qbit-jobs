@@ -171,7 +171,7 @@
 
    <profiles>
       <!-- Built against qqq 4.1. Until qbit-build-parent imports the released 4.1 BOM, this    -->
-      <!-- profile is active by default and imports qqq-bom-pom 4.1.0-RC.5 ahead of the parent's -->
+      <!-- profile is active by default and imports qqq-bom-pom 4.1.0-RC.8 ahead of the parent's -->
       <!-- 4.0.0 BOM (ADR-0007, as in the other qbits).                                          -->
       <profile>
          <id>qqq-snapshot</id>
@@ -179,7 +179,7 @@
             <activeByDefault>true</activeByDefault>
          </activation>
          <properties>
-            <qqq.snapshot.version>4.1.0-RC.5</qqq.snapshot.version>
+            <qqq.snapshot.version>4.1.0-RC.8</qqq.snapshot.version>
          </properties>
          <dependencyManagement>
             <dependencies>

@@ -34,6 +34,7 @@ import org.quartz.CronExpression;
 public class JobsQBitConfig implements QBitConfig
 {
    private String appName = "jobs";
+   private String parentAppName;
    private int retentionDays = 30;
    private int inputRetentionDays = 7;
    private String purgeCronExpression = "0 30 3 * * ?";
@@ -42,12 +43,38 @@ public class JobsQBitConfig implements QBitConfig
    private String schedulerName = null;
 
    /*******************************************************************************
+    ** Get the optional host parent app.
+    *******************************************************************************/
+   public String getParentAppName()
+   {
+      return (parentAppName);
+   }
+
+   /*******************************************************************************
+    ** Set the optional host parent app.
+    *******************************************************************************/
+   public void setParentAppName(String parentAppName)
+   {
+      this.parentAppName = parentAppName;
+   }
+
+   /*******************************************************************************
+    ** Place Jobs under an existing host app, such as Operations under Admin.
+    *******************************************************************************/
+   public JobsQBitConfig withParentAppName(String parentAppName)
+   {
+      this.parentAppName = parentAppName;
+      return (this);
+   }
+
+   /*******************************************************************************
     ** Report invalid settings before adding any metadata.
     *******************************************************************************/
    @Override
    public void validate(QInstance instance, List<String> errors)
    {
       assertCondition(appName != null && appName.matches("[A-Za-z][A-Za-z0-9_]*"), "appName must be a valid name", errors);
+      assertCondition(parentAppName == null || (!parentAppName.equals(appName) && instance.getApp(parentAppName) != null), "parentAppName must name an existing, different app", errors);
       assertCondition(retentionDays > 0, "retentionDays must be positive", errors);
       assertCondition(inputRetentionDays > 0 && inputRetentionDays <= retentionDays, "inputRetentionDays must be positive and no greater than retentionDays", errors);
       assertCondition(homeRefreshSeconds > 0 && recordRefreshSeconds > 0, "refresh seconds must be positive", errors);

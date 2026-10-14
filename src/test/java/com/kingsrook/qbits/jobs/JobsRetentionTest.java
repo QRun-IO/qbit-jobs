@@ -155,20 +155,20 @@ class JobsRetentionTest extends BaseJobsTest
    }
 
    /*******************************************************************************
-    ** RC.5 safely skips unavailable object deletion and preserves retry references.
+    ** Core storage failures preserve input references for retry.
     *******************************************************************************/
    @Test
-   void releasedCoreSkipsObjectDeletion() throws Exception
+   void missingStoragePreservesReferences() throws Exception
    {
       QRecord clean = job(USER_A, COMPLETED, now.minus(8, ChronoUnit.DAYS));
       clearFailures(clean);
       children(clean);
       instance.withSupplementalMetaData(new StorageMetadata());
-      assertThat(run(new JobsPurgeFinishedStep())).extracting(ProcessSummaryLine::getCount).containsExactly(0, 0, 0);
+      assertThatThrownBy(() -> run(new JobsPurgeFinishedStep())).hasMessageContaining("Could not delete durable jobs storage object");
       assertThat(records(JOBS_CHUNK).getFirst().getValue(INPUT_STORAGE_REF)).isNotNull();
       JobsStorage storage = new JobsStorage();
       assertThat(storage.chunkStorageTable()).isEqualTo("objects");
-      assertThat(storage.delete("objects", "another-object")).isFalse();
+      assertThatThrownBy(() -> storage.delete("objects", "another-object")).hasMessageContaining("Could not delete durable jobs storage object");
       assertThat(storage.delete(null, "object")).isFalse();
       assertThat(storage.delete("objects", null)).isFalse();
    }

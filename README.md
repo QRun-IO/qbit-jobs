@@ -35,6 +35,7 @@ The tables are core's, prefixed `jobs_`. This qbit adds no tables.
 | `jobs_chunk` | The leased units of work, with attempts, checkpoints and per-chunk counts. Child list on the job. |
 | `jobs_row_error` | Which rows failed and why. Child list on the job; reportable. |
 | `jobs_effect` | Side effects outside the database (outbox): email, HTTP, S3, other databases; child list on the job. |
+| `jobs_log` | Append-only, owner-scoped log lines (level, time, phase, message); optional child list on the job. |
 | `jobs_event` | The job's timeline (launched, reclaimed, paused, completed and so on). Child list on the job. |
 | `jobs_worker` | The pods that run jobs. |
 | `jobs_upload` | Uploaded files (refs, owners, expiry). |
@@ -52,7 +53,17 @@ The tables are core's, prefixed `jobs_`. This qbit adds no tables.
 - `schedulerName` (null; set to a host scheduler name to enable the schedule);
 - `homeRefreshSeconds` (5);
 - `recordRefreshSeconds` (3);
-- `appName` (`jobs`).
+- `appName` (`jobs`);
+- `parentAppName` (null; an existing host app, such as `operations` under Admin).
+
+To place Jobs at **Admin > Operations > Jobs**, register the host Admin and Operations
+apps first (Operations has Admin as its parent), then produce with:
+```java
+new JobsQBitProducer().withQBitConfig(new JobsQBitConfig()
+   .withParentAppName("operations")).produce(qInstance);
+```
+The parent must exist and differ from `appName`; Jobs attaches to its children.
+With no parent configured, Jobs remains a top-level app. Placement does not grant permissions.
 
 ## Adopting in another app
 1. Enable durable jobs in core (above) and create the tables. `docs/ddl/postgres.sql` is the Postgres
@@ -63,7 +74,9 @@ The tables are core's, prefixed `jobs_`. This qbit adds no tables.
 
 ## Build
 ```bash
-./mvnw verify    # tests, checkstyle (main and test sources), JaCoCo gate
+./mvnw -o verify    # CI/release dependency: QQQ 4.1.0-RC.8
+./mvnw -o -Dqqq.snapshot.version=4.1.0-SNAPSHOT verify  # locally installed core branch
+# Windows: use ./mvnw.cmd
 ```
 
 The local demo server (`src/demo/java`, used for the screenshots) runs against a locally installed
@@ -79,8 +92,11 @@ mvn install -DskipTests -Drevision=4.1.0-JOBS-SNAPSHOT
 
 ## Compatibility and display
 
-The default build uses released core **4.1.0-RC.5**, which has no durable jobs kernel.
-Production requires the kernel and the following core fixes (expected in RC.7; RC.6 shipped without them):
+The default build targets core **4.1.0-RC.8**, which will ship the progress/log API.
+Local verification can override `qqq.snapshot.version` with the installed branch SNAPSHOT,
+without enabling the demo profile. Older metadata remains tolerated: optional progress
+fields may be absent/null, and Log requires both `jobs_log` and its inferred job join.
+The existing compatibility bridges cover these core contracts:
 
 - `QRun-IO/qqq#1178`: the jobs tables, constants and security metadata (alert types
   `jobs.job-failed` and `jobs.job-stalled`).
@@ -97,7 +113,9 @@ so the data carries no second title.
 - **Tables.** The running, attention and worker tables have two or three flexible
   columns. Their cells are composite widget blocks:
   - the job's label links to its record, with the process label under it;
-  - a progress bar shows the percent and rows done;
+  - a progress bar uses `percentDone` when present (including zero), otherwise rows/chunks;
+  - phase labels come from `progressJson.phases` with `currentPhase` as fallback;
+  - plain text shows the progress message and optional bytes in B/KiB/MiB/GiB;
   - the status line is a label (or the waiting reason) with the rate and ETA.
   Each row also keeps its plain values (`Job`, `Process`, `Status`, `Rows`, `Rate`,
   `ETA`, `Path` and so on) for exports and other clients.
@@ -113,6 +131,13 @@ Its output contains standard process summary lines for jobs purged, chunk object
 removed during purge, and input objects removed (uploads plus retained-job inputs).
 Jobs with effects outside SENT/FAILED, or with effects needing review, keep their rows
 and inputs. When any are skipped, the summary includes "N jobs kept: effects still outstanding".
+The Log list follows Live Progress, before Events: level, time, phase and message,
+ordered by `id` ascending (newest last), full width, with the standard child-list
+25-row limit and View all link. Live Progress also shows explicit ETA and a notice
+when `logDropped` is positive. The log is read-only for users, including admins;
+retention deletes it through the existing system session in 200-row keyset batches
+with 64-bit log cursors, before deleting chunks and jobs.
+
 Needs attention shows each listed job's effect-review count; Live Progress adds an Effects
 group (Sent, Pending, Failed, Needs review) when the job has effects.
 

@@ -23,6 +23,29 @@ and phase 4. Owner decisions: all of that spec's recommendations are accepted (2
 - **R6, storage.** Retention deletes finished jobs and their chunk objects from object storage. The
   qbit reads and writes no files.
 
+## Progress and log adoption (core RC.8)
+
+Implements sections 2 and 7 of core `JOB-PROGRESS-AND-JOBS-TRAY.md`. The default
+BOM is 4.1.0-RC.8; local verification uses `-Dqqq.snapshot.version=4.1.0-SNAPSHOT`.
+Optional names remain in `JobsCoreContract` without importing `core.jobs`.
+
+- Home and Live Progress prefer nullable `percentDone`, including explicit zero,
+  then retain rows/chunks derivation. The snapshot supplies the current phase label;
+  missing or invalid JSON falls back to `currentPhase`. Both views include the
+  progress message, optional binary byte counts, and explicit `etaSeconds` ahead
+  of the existing rate-derived ETA. No HTML, fixed widths, or theme-specific colors.
+- Log is a full-width standard child list immediately after Live Progress, before
+  Events, only if both table and join exist. It displays level, loggedAt, phase and
+  message, sorted by id ascending, with the standard 25-row preview/View all.
+  The panel reads through the current viewer and core joined owner lock.
+- A positive `logDropped` produces an earlier-lines-not-kept notice in Live Progress.
+- Retention deletes logs before chunks/jobs, using the existing 200-row keyset loop
+  with a long child cursor. Core `JobLogPermissions` explicitly permits system
+  sessions and denies user mutations even for admins. Tests load the actual checker.
+- Hosts set `parentAppName` to their existing Operations app under Admin; the qbit
+  sets the parent and attaches Jobs as a child, while retaining configurable appName.
+  Missing/self parents fail validation before registration. Default remains top-level.
+
 ## The app
 - `jobs` app, label **Jobs**. The nav lists `jobs_job` only. Chunks, row errors, effects and events are child
   lists on the job record.
@@ -57,7 +80,7 @@ and phase 4. Owner decisions: all of that spec's recommendations are accepted (2
     without needsReview), Failed and Needs review. Review effects appear only in Needs review.
     The group is omitted when there are no effects or the effects table is absent.
     It refreshes every 3s while the job is active.
-  - Child lists for **Chunks**, **Row errors**, **Effects** and **Events**. Effects is
+  - Child lists for **Log**, **Chunks**, **Row errors**, **Effects** and **Events**. Effects is
     included only when the effects table and its inferred job join exist; it uses the same
     joined owner lock as row errors.
   - A **Changes made by this job** link to the audit table, filtered to messages containing
@@ -68,7 +91,7 @@ and phase 4. Owner decisions: all of that spec's recommendations are accepted (2
 ## Retention
 `jobsPurgeFinished` is a hidden scheduled process, not in the nav. It runs daily by default.
 - It deletes jobs that finished more than `retentionDays` ago (default 30), with their chunks, row
-  errors, effects, events and chunk objects. Effects are removed before chunks and jobs.
+  errors, effects, logs, events and chunk objects. Effects are removed before chunks and jobs.
 - Jobs with any effect outside SENT/FAILED, or any effect needing review, keep their rows
   and inputs. The summary reports "N jobs kept: effects still outstanding" when any are skipped.
   Cores without the effects table retain the existing behavior.
@@ -84,8 +107,8 @@ these to qqq-esb, qbit-quick-search and qbit-data-analysis.
 The qbit builds against the released QQQ RC through the default `qqq-snapshot` profile. Until the
 kernel ships in an RC, the core names it needs (table, field and process names, and the jobs session
 keys) are mirrored in `JobsCoreContract`, tagged
-`STAND-IN(core=QRun-IO/qqq#1178, removeBy=RC.7)`. When RC.7 is released, those constants switch to
-core's `DurableJobsTables`, and `JobsCoreContract` and the test-only table mirror are deleted.
+`STAND-IN(core=QRun-IO/qqq#1178, removeBy=RC.7)`. Replacing the remaining mirrored constants and older-metadata test fixtures with
+core imports is a separate compatibility cleanup; this change retains them.
 The optional outbox additions carry `STAND-IN(core=QRun-IO/qqq#1191, removeBy=RC.7)`.
 The demo server (`-Pdemo`, under `src/demo/java`) runs against a locally installed 4.1.0-SNAPSHOT of
 the kernel branch. It is how the screenshots are taken.

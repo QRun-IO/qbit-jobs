@@ -21,6 +21,15 @@ CREATE TABLE jobs_job
    semantics                 VARCHAR(20),
    chunk_size                INTEGER,
    max_parallel_chunks       INTEGER,
+   current_phase             VARCHAR(250),
+   percent_done              INTEGER,
+   progress_message          VARCHAR(1000),
+   bytes_done                BIGINT,
+   bytes_total               BIGINT,
+   eta_seconds               BIGINT,
+   progress_json             TEXT,
+   log_seq                   BIGINT,
+   log_dropped               INTEGER,
    rows_total                INTEGER,
    rows_done                 INTEGER,
    rows_ok                   INTEGER,
@@ -173,3 +182,17 @@ CREATE TABLE jobs_upload
    job_id             INTEGER,
    create_date        TIMESTAMPTZ
 );
+
+-- RC.8 job progress log; host migrations must also add the jobs_job columns above.
+CREATE TABLE jobs_log
+(
+   id BIGSERIAL PRIMARY KEY,
+   job_id INTEGER NOT NULL REFERENCES jobs_job(id) ON DELETE CASCADE,
+   chunk_id INTEGER REFERENCES jobs_chunk(id) ON DELETE SET NULL,
+   attempt INTEGER,
+   level VARCHAR(10) NOT NULL,
+   logged_at TIMESTAMPTZ NOT NULL,
+   phase VARCHAR(250),
+   message VARCHAR(1000)
+);
+CREATE INDEX jobs_log_cursor_idx ON jobs_log(job_id, id);
