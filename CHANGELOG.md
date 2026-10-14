@@ -7,6 +7,14 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Optional effects outbox child list, viewer-scoped attention review counts and typed
+  Live Progress effect statistics; Data Analysis includes `jobs_effect`.
+- `jobs.effect-unresolved` warning alert for effects requiring outcome review.
+- Retention deletes settled effects and preserves jobs and inputs with outstanding
+  effects, reporting the number kept in the process summary.
+- RC.6 outbox contract/test stand-ins, Postgres table and indexes, and coverage for
+  effect counts, owner isolation, retention and cores without the effects table.
+
 - Jobs app with six typed home widgets for live progress, throughput, attention,
   worker health and 30-day history, scoped to each viewer's record permissions.
 - Job progress, ordered chunk/error/event child lists, and filtered audit links.
@@ -14,7 +22,7 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Configurable, hidden, scheduled retention with system-session isolation, paged
   deletion, object cleanup compatibility and standard process summary lines.
 - Opt-in ESB, Quick Search and Data Analysis registration lists.
-- Postgres DDL for the six core tables and indexes.
+- Postgres DDL for the core tables and indexes.
 - Released RC.5 contract/security/storage stand-ins and memory-backed tests.
 - Offline Maven wrapper build with checkstyle and JaCoCo coverage enforcement.
 - Readable home widgets:

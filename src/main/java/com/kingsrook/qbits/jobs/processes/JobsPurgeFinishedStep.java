@@ -51,17 +51,21 @@ import com.kingsrook.qqq.backend.core.model.session.QSession;
 import com.kingsrook.qqq.backend.core.model.session.QSystemUserSession;
 import com.kingsrook.qqq.backend.core.processes.implementations.etl.streamedwithfrontend.StreamedETLWithFrontendProcess;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.COMPLETED;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.FAILED;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.FINISHED_AT;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.ID;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.INPUT_STORAGE_REF;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_ADMIN;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_CHUNK;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_EFFECT;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_EVENT;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_JOB;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_ROW_ERROR;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_UPLOAD;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOB_ID;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.NEEDS_REVIEW_FIELD;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.ROWS_FAILED;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.SENT;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.STATUS;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.STORAGE_REFERENCE;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.STORAGE_TABLE_NAME;
@@ -105,7 +109,7 @@ public class JobsPurgeFinishedStep implements BackendStep
       }
       JobsQBitConfig config = (JobsQBitConfig) QContext.getQInstance().getQBits().get(JobsQBitProducer.QBIT_NAME).getConfig();
       QSession caller = QContext.getQSession();
-      int[] counts = new int[3];
+      int[] counts = new int[4];
       try
       {
          QContext.setQSession(new QSystemUserSession());
@@ -121,6 +125,10 @@ public class JobsPurgeFinishedStep implements BackendStep
       summary.add(new ProcessSummaryLine(Status.INFO, counts[0], "jobs purged"));
       summary.add(new ProcessSummaryLine(Status.INFO, counts[1], "chunk objects deleted"));
       summary.add(new ProcessSummaryLine(Status.INFO, counts[2], "input objects deleted"));
+      if(counts[3] > 0)
+      {
+         summary.add(new ProcessSummaryLine(Status.INFO, counts[3], "jobs kept: effects still outstanding"));
+      }
       output.addValue(StreamedETLWithFrontendProcess.FIELD_PROCESS_SUMMARY, summary);
    }
 
@@ -142,6 +150,15 @@ public class JobsPurgeFinishedStep implements BackendStep
          for(QRecord job : jobs)
          {
             lastId = job.getValueInteger(ID);
+            if(hasOutstandingEffects(lastId))
+            {
+               counts[3]++;
+               continue;
+            }
+            if(QContext.getQInstance().getTable(JOBS_EFFECT) != null)
+            {
+               removeChildren(JOBS_EFFECT, lastId, counts);
+            }
             removeChildren(JOBS_ROW_ERROR, lastId, counts);
             removeChildren(JOBS_EVENT, lastId, counts);
             removeChildren(JOBS_CHUNK, lastId, counts);
@@ -150,6 +167,23 @@ public class JobsPurgeFinishedStep implements BackendStep
             counts[0]++;
          }
       }
+   }
+
+   /*******************************************************************************
+    ** Preserve unresolved outbox work, including unknown or missing statuses.
+    *******************************************************************************/
+   private boolean hasOutstandingEffects(int jobId) throws QException
+   {
+      if(QContext.getQInstance().getTable(JOBS_EFFECT) == null)
+      {
+         return (false);
+      }
+      QQueryFilter outstanding = new QQueryFilter().withBooleanOperator(QQueryFilter.BooleanOperator.OR)
+         .withCriteria(STATUS, QCriteriaOperator.NOT_IN, List.of(SENT, FAILED))
+         .withCriteria(STATUS, QCriteriaOperator.IS_BLANK)
+         .withCriteria(NEEDS_REVIEW_FIELD, QCriteriaOperator.EQUALS, true);
+      QQueryFilter filter = new QQueryFilter().withCriteria(JOB_ID, QCriteriaOperator.EQUALS, jobId).withSubFilter(outstanding).withLimit(1);
+      return (!new QueryAction().execute(new QueryInput().withTableName(JOBS_EFFECT).withFilter(filter)).getRecords().isEmpty());
    }
 
    /*******************************************************************************
@@ -200,7 +234,10 @@ public class JobsPurgeFinishedStep implements BackendStep
          for(QRecord job : jobs)
          {
             lastId = job.getValueInteger(ID);
-            cleanJobInputs(lastId, counts);
+            if(!hasOutstandingEffects(lastId))
+            {
+               cleanJobInputs(lastId, counts);
+            }
          }
       }
    }

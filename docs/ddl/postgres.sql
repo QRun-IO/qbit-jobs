@@ -96,6 +96,43 @@ CREATE TABLE jobs_row_error
 
 CREATE INDEX jobs_row_error_job_idx ON jobs_row_error (job_id);
 
+-- STAND-IN(core=QRun-IO/qqq#1191, removeBy=RC.6): transactional outbox.
+CREATE TABLE jobs_effect
+(
+   id                 SERIAL PRIMARY KEY,
+   job_id             INTEGER NOT NULL REFERENCES jobs_job (id) ON DELETE CASCADE,
+   effect_name        VARCHAR(100),
+   status             VARCHAR(30),
+   needs_review       BOOLEAN DEFAULT FALSE,
+   row_key            VARCHAR(250),
+   target_name        VARCHAR(100),
+   effect_type        VARCHAR(30),
+   chunk_id           INTEGER,
+   chunk_seq          INTEGER,
+   idempotency_key    VARCHAR(500),
+   payload_json       TEXT,
+   payload_ref        VARCHAR(1000),
+   attempt            INTEGER DEFAULT 0,
+   max_attempts       INTEGER,
+   reconcile_attempts INTEGER DEFAULT 0,
+   next_attempt_at    TIMESTAMPTZ,
+   lease_owner        VARCHAR(250),
+   lease_token        VARCHAR(100),
+   lease_expires_at   TIMESTAMPTZ,
+   lease_version      INTEGER DEFAULT 0,
+   provider_ref       VARCHAR(500),
+   last_error         TEXT,
+   sent_at            TIMESTAMPTZ,
+   create_date        TIMESTAMPTZ,
+   modify_date        TIMESTAMPTZ
+);
+
+CREATE UNIQUE INDEX jobs_effect_idempotency_idx ON jobs_effect (idempotency_key);
+
+CREATE INDEX jobs_effect_status_idx ON jobs_effect (status, next_attempt_at);
+
+CREATE INDEX jobs_effect_job_idx ON jobs_effect (job_id);
+
 CREATE TABLE jobs_event
 (
    id             SERIAL PRIMARY KEY,

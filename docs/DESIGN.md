@@ -14,17 +14,17 @@ and phase 4. Owner decisions: all of that spec's recommendations are accepted (2
   a CLI, iOS) can render it.
 
 ## Requirements traced (owner R1-R6)
-- **R3, reportable.** Jobs, chunks, row errors and events are standard tables, with full record
-  screens, reports, Data Analysis and Quick Search. The home shows live progress, throughput, failures
-  and history. Every job links to its audit trail.
-- **R4, notifications.** The alert types `jobs.job-failed` and `jobs.job-stalled`, and the `jobs.reaper`
-  heartbeat monitor, are declared here so that qbit-alerts routes them. Completion notifications come
-  from core.
+- **R3, reportable.** Jobs, chunks, row errors, effects and events are standard tables, with full record
+  screens, reports and Data Analysis. Quick Search registers jobs only. The home shows live progress,
+  throughput, failures and history. Every job links to its audit trail.
+- **R4, notifications.** The alert types `jobs.job-failed`, `jobs.job-stalled` and `jobs.effect-unresolved`
+  ("Job effect needs review", WARNING), and the `jobs.reaper` heartbeat monitor, are declared here
+  so that qbit-alerts routes them. Completion notifications come from core.
 - **R6, storage.** Retention deletes finished jobs and their chunk objects from object storage. The
   qbit reads and writes no files.
 
 ## The app
-- `jobs` app, label **Jobs**. The nav lists `jobs_job` only. Chunks, row errors and events are child
+- `jobs` app, label **Jobs**. The nav lists `jobs_job` only. Chunks, row errors, effects and events are child
   lists on the job record.
 - **Home**, built from typed widgets read in the viewer's session (record locks apply: a user sees
   their own jobs, `jobs_admin` sees all). Live widgets set `defaultValues.refreshSeconds` (polling; the
@@ -41,6 +41,8 @@ and phase 4. Owner decisions: all of that spec's recommendations are accepted (2
   4. **Needs attention** (`TABLE`): FAILED, NEEDS_REVIEW and COMPLETED_WITH_ERRORS jobs from the
      last 7 days. Failed and needs-review jobs come first, newest first within each group.
      Each row shows the job, the error on its own line, the rows failed and the finish time.
+     The status cell includes "N effects need review" when applicable, from one viewer-scoped
+     effects query for the listed jobs. RUNNING jobs remain excluded; core moves them to NEEDS_REVIEW.
   5. **Workers** (`TABLE`): pods from `jobs_worker`, with threads, draining, and last heartbeat
      age (admins only).
   6. **Job history** (`STACKED_BAR_CHART`): jobs per day over the last 30 days, by final
@@ -51,8 +53,13 @@ and phase 4. Owner decisions: all of that spec's recommendations are accepted (2
   - A **Live Progress** panel (`MULTI_STATISTICS`) has three groups: Rows (succeeded, failed,
     total, and the percent done), Chunks (done, failed, total) and Speed (rows per minute, with
     the ETA, the finish time or the status).
+    An optional fourth group, Effects, shows Sent, Pending (PENDING, SENDING and UNKNOWN
+    without needsReview), Failed and Needs review. Review effects appear only in Needs review.
+    The group is omitted when there are no effects or the effects table is absent.
     It refreshes every 3s while the job is active.
-  - Child lists for **Chunks**, **Row errors** and **Events**.
+  - Child lists for **Chunks**, **Row errors**, **Effects** and **Events**. Effects is
+    included only when the effects table and its inferred job join exist; it uses the same
+    joined owner lock as row errors.
   - A **Changes made by this job** link to the audit table, filtered to messages containing
     `job:<id>/` (core writes `job:<id>/chunk:<seq>` into every audit the job causes).
   - The record actions are core's: Start, Pause, Resume, Cancel, Retry Failed, Retry Failed Rows,
@@ -61,7 +68,10 @@ and phase 4. Owner decisions: all of that spec's recommendations are accepted (2
 ## Retention
 `jobsPurgeFinished` is a hidden scheduled process, not in the nav. It runs daily by default.
 - It deletes jobs that finished more than `retentionDays` ago (default 30), with their chunks, row
-  errors, events and chunk objects.
+  errors, effects, events and chunk objects. Effects are removed before chunks and jobs.
+- Jobs with any effect outside SENT/FAILED, or any effect needing review, keep their rows
+  and inputs. The summary reports "N jobs kept: effects still outstanding" when any are skipped.
+  Cores without the effects table retain the existing behavior.
 - For COMPLETED jobs with no failed rows, it deletes the chunk input objects after
   `inputRetentionDays` (default 7).
 - Each run's summary is the standard process summary.
@@ -76,5 +86,6 @@ kernel ships in an RC, the core names it needs (table, field and process names, 
 keys) are mirrored in `JobsCoreContract`, tagged
 `STAND-IN(core=QRun-IO/qqq#1178, removeBy=RC.6)`. When RC.6 is released, those constants switch to
 core's `DurableJobsTables`, and `JobsCoreContract` and the test-only table mirror are deleted.
+The optional outbox additions carry `STAND-IN(core=QRun-IO/qqq#1191, removeBy=RC.6)`.
 The demo server (`-Pdemo`, under `src/demo/java`) runs against a locally installed 4.1.0-SNAPSHOT of
 the kernel branch. It is how the screenshots are taken.

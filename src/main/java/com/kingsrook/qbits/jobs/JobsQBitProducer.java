@@ -54,6 +54,7 @@ import com.kingsrook.qqq.backend.core.model.metadata.qbits.QBitMetaDataProducer;
 import com.kingsrook.qqq.backend.core.model.metadata.scheduleing.QScheduleMetaData;
 import com.kingsrook.qqq.backend.core.model.metadata.tables.QFieldSection;
 import com.kingsrook.qqq.backend.core.model.metadata.tables.Tier;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.ALERT_EFFECT_UNRESOLVED;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.ALERT_JOB_FAILED;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.ALERT_JOB_STALLED;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.ALL_TABLES;
@@ -62,6 +63,7 @@ import static com.kingsrook.qbits.jobs.JobsCoreContract.HEARTBEAT_REAPER;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.ID;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_ADMIN;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_CHUNK;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_EFFECT;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_EVENT;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_JOB;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_ROW_ERROR;
@@ -166,6 +168,10 @@ public class JobsQBitProducer implements QBitMetaDataProducer<JobsQBitConfig>
       addRecordSection(instance, "jobsJobProgress", "Live Progress");
       child(instance, JOBS_CHUNK, "jobsJobChunks", "Chunks", SEQ, true);
       child(instance, JOBS_ROW_ERROR, "jobsJobRowErrors", "Row Errors", ROW_NUMBER, true);
+      if(instance.getTable(JOBS_EFFECT) != null && instance.getJoin(JobsCoreContract.childJoin(JOBS_EFFECT)) != null)
+      {
+         child(instance, JOBS_EFFECT, "jobsJobEffects", "Effects", ID, true);
+      }
       child(instance, JOBS_EVENT, "jobsJobEvents", "Events", ID, false);
       if(instance.getTable(AUDIT) != null)
       {
@@ -245,6 +251,8 @@ public class JobsQBitProducer implements QBitMetaDataProducer<JobsQBitConfig>
             .withSubjectTableName(JOBS_JOB).withSourceQBitName(QBIT_NAME).withHowToFix("Inspect the job error and row errors, correct the cause, then retry failed work."))
          .withAlertType(new QAlertTypeMetaData().withName(ALERT_JOB_STALLED).withLabel("Job stalled").withDefaultSeverity(AlertSeverity.WARNING)
             .withSubjectTableName(JOBS_JOB).withSourceQBitName(QBIT_NAME).withHowToFix("Check worker heartbeats, storage access and chunk leases; restore workers before retrying."))
+         .withAlertType(new QAlertTypeMetaData().withName(ALERT_EFFECT_UNRESOLVED).withLabel("Job effect needs review").withDefaultSeverity(AlertSeverity.WARNING)
+            .withSubjectTableName(JOBS_JOB).withSourceQBitName(QBIT_NAME).withHowToFix("Review the effect and confirm its outcome with the provider before retrying."))
          .withAlertType(new QAlertTypeMetaData().withName(HEARTBEAT_REAPER).withLabel("Job reaper stopped").withDefaultSeverity(AlertSeverity.ERROR)
             .withSourceQBitName(QBIT_NAME).withVisibilityPermission(JOBS_ADMIN).withDescription("No pod is reaping leases.")
             .withHowToFix("Restore a durable jobs runtime so expired chunk leases are reclaimed.")

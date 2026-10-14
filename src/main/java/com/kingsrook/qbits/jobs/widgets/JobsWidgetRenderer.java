@@ -81,17 +81,21 @@ import static com.kingsrook.qbits.jobs.JobsCoreContract.COMPLETED_WITH_ERRORS;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.DONE;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.DRAINING;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.ERROR_MESSAGE;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.FAILED;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.FINISHED_AT;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.HEARTBEAT_AT;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.ID;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_ADMIN;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_CHUNK;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_EFFECT;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_JOB;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_WORKER;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOB_ID;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.LABEL;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.LAST_PROGRESS_AT;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.MESSAGE;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.NEEDS_REVIEW_FIELD;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.PENDING;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.POD_ID;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.PRIORITY;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.PROCESS_NAME;
@@ -103,11 +107,14 @@ import static com.kingsrook.qbits.jobs.JobsCoreContract.ROWS_IN;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.ROWS_OK;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.ROWS_TOTAL;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.RUNNING_STATUSES;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.SENDING;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.SENT;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.STARTED_AT;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.STATUS;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.STATUS_REASON;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.TERMINAL_STATUSES;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.THREADS;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.UNKNOWN;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.statusLabel;
 
 
@@ -321,8 +328,19 @@ public class JobsWidgetRenderer extends AbstractWidgetRenderer
       jobs.sort(Comparator.comparingInt((QRecord job) -> COMPLETED_WITH_ERRORS.equals(job.getValueString(STATUS)) ? 1 : 0)
          .thenComparing((QRecord job) -> job.getValueInstant(FINISHED_AT), Comparator.nullsLast(Comparator.reverseOrder())));
 
+      List<QRecord> listedJobs = jobs.subList(0, Math.min(25, jobs.size()));
+      Map<Integer, Integer> reviewCounts = new HashMap<>();
+      if(!listedJobs.isEmpty() && QContext.getQInstance().getTable(JOBS_EFFECT) != null)
+      {
+         QQueryFilter filter = new QQueryFilter().withCriteria(JOB_ID, QCriteriaOperator.IN, listedJobs.stream().map(job -> job.getValueInteger(ID)).toList())
+            .withCriteria(NEEDS_REVIEW_FIELD, QCriteriaOperator.EQUALS, true);
+         for(QRecord effect : query(JOBS_EFFECT, filter))
+         {
+            reviewCounts.merge(effect.getValueInteger(JOB_ID), 1, Integer::sum);
+         }
+      }
       List<Map<String, Object>> rows = new ArrayList<>();
-      for(QRecord job : jobs.subList(0, Math.min(25, jobs.size())))
+      for(QRecord job : listedJobs)
       {
          String error    = JobsFormat.clip(job.getValueString(ERROR_MESSAGE), 120);
          String failed   = count(job, ROWS_FAILED) + (number(job, ROWS_FAILED) == 1 ? " row failed" : " rows failed");
@@ -335,6 +353,11 @@ public class JobsWidgetRenderer extends AbstractWidgetRenderer
          if(number(job, ROWS_FAILED) > 0)
          {
             statusCell.withBlock(small(failed));
+         }
+         int effectsNeedingReview = reviewCounts.getOrDefault(job.getValueInteger(ID), 0);
+         if(effectsNeedingReview > 0)
+         {
+            statusCell.withBlock(small(effectsNeedingReview + " effects need review"));
          }
          row.put(STATUS_CELL, statusCell.withBlock(small(finished)));
          rows.add(row);
@@ -456,9 +479,9 @@ public class JobsWidgetRenderer extends AbstractWidgetRenderer
 
 
    /*******************************************************************************
-    ** Record progress: rows, chunks and speed, without disclosing an inaccessible job.
+    ** Record progress: rows, chunks, speed and optional effects, scoped to the viewer.
     *******************************************************************************/
-   private MultiStatisticsData progress(QRecord job, Instant now)
+   private MultiStatisticsData progress(QRecord job, Instant now) throws QException
    {
       if(job == null)
       {
@@ -501,7 +524,36 @@ public class JobsWidgetRenderer extends AbstractWidgetRenderer
       }
       MultiStatisticsData.StatisticsGroupData speed = new MultiStatisticsData.StatisticsGroupData().withHeader("Speed").withSubheader(speedNote)
          .withStatisticList(List.of(statistic("Rows per minute", Math.round(rate(job, now)), null)));
-      return (new MultiStatisticsData(null, List.of(rows, chunks, speed)));
+      List<MultiStatisticsData.StatisticsGroupData> groups = new ArrayList<>(List.of(rows, chunks, speed));
+      if(QContext.getQInstance().getTable(JOBS_EFFECT) != null)
+      {
+         List<QRecord> effects = query(JOBS_EFFECT, new QQueryFilter().withCriteria(JOB_ID, QCriteriaOperator.EQUALS, job.getValue(ID)));
+         if(!effects.isEmpty())
+         {
+            long sent = 0;
+            long pending = 0;
+            long failed = 0;
+            long review = 0;
+            for(QRecord effect : effects)
+            {
+               if(Boolean.TRUE.equals(effect.getValueBoolean(NEEDS_REVIEW_FIELD)))
+               {
+                  review++;
+               }
+               else
+               {
+                  String effectStatus = effect.getValueString(STATUS);
+                  sent += SENT.equals(effectStatus) ? 1 : 0;
+                  failed += FAILED.equals(effectStatus) ? 1 : 0;
+                  pending += PENDING.equals(effectStatus) || SENDING.equals(effectStatus) || UNKNOWN.equals(effectStatus) ? 1 : 0;
+               }
+            }
+            groups.add(new MultiStatisticsData.StatisticsGroupData().withHeader("Effects").withStatisticList(List.of(
+               statistic("Sent", sent, null), statistic("Pending", pending, null),
+               statistic("Failed", failed, null), statistic("Needs review", review, null))));
+         }
+      }
+      return (new MultiStatisticsData(null, groups));
    }
 
 

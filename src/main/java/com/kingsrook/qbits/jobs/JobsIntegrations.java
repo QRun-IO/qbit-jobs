@@ -54,7 +54,7 @@ public final class JobsIntegrations
    }
 
    /*******************************************************************************
-    ** Reportable job data.
+    ** Reportable job data, including the optional effects outbox.
     *******************************************************************************/
    public static List<String> dataAnalysisTables()
    {
