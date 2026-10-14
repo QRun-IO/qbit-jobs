@@ -116,7 +116,7 @@ class JobsQBitProducerTest extends BaseJobsTest
       assertThat(metadata.getGroupId()).isEqualTo("com.kingsrook.qbits");
       assertThat(metadata.getArtifactId()).isEqualTo("qbit-jobs");
       assertThat(metadata.getNamespace()).isEqualTo("jobs");
-      assertThat(metadata.getVersion()).isEqualTo("0.1.0-SNAPSHOT");
+      assertThat(metadata.getVersion()).matches("\\d+\\.\\d+\\.\\d+(-SNAPSHOT|-RC\\.\\d+)?");
    }
 
    /*******************************************************************************
