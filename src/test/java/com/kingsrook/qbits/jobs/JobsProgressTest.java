@@ -102,6 +102,13 @@ class JobsProgressTest extends BaseJobsTest
          instance.getTable(JOBS_JOB).withField(new QFieldMetaData(field, QFieldType.LONG));
       }
       instance.setEnforcePermissionsInCoreActions(true);
+      //////////////////////////////////////////////////////////////////////
+      // core 4.1.0-RC.8 defines jobs_log; older metadata gets this mirror //
+      //////////////////////////////////////////////////////////////////////
+      if(instance.getTable(JOBS_LOG) != null)
+      {
+         return;
+      }
       instance.addTable(new QTableMetaData().withName(JOBS_LOG).withBackendName("memory").withPrimaryKeyField(ID)
          .withField(new QFieldMetaData(ID, QFieldType.LONG))
          .withField(new QFieldMetaData(JOB_ID, QFieldType.INTEGER))
@@ -225,7 +232,7 @@ class JobsProgressTest extends BaseJobsTest
    @Test
    void optionalLogAndHostNavigation() throws Exception
    {
-      assertThat(instance.getWidget("jobsJobLog")).isNull();
+      assertThat(instance.getWidget("jobsJobLog")).as("core RC.8 defines jobs_log, so the Log list is produced").isNotNull();
       enableProgress();
       instance.getJoins().remove(JobsCoreContract.childJoin(JOBS_LOG));
       instance.getWidgets().remove("jobsJobLog");

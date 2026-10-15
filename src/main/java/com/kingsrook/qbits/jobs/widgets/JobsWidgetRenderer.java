@@ -45,12 +45,12 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.kingsrook.qbits.jobs.JobsSecurity;
 import com.kingsrook.qqq.backend.core.actions.dashboard.widgets.AbstractWidgetRenderer;
 import com.kingsrook.qqq.backend.core.actions.tables.CountAction;
 import com.kingsrook.qqq.backend.core.actions.tables.QueryAction;
 import com.kingsrook.qqq.backend.core.context.QContext;
 import com.kingsrook.qqq.backend.core.exceptions.QException;
+import com.kingsrook.qqq.backend.core.jobs.DurableJobsSecurity;
 import com.kingsrook.qqq.backend.core.model.actions.tables.count.CountInput;
 import com.kingsrook.qqq.backend.core.model.actions.tables.query.QCriteriaOperator;
 import com.kingsrook.qqq.backend.core.model.actions.tables.query.QFilterOrderBy;
@@ -153,7 +153,7 @@ public class JobsWidgetRenderer extends AbstractWidgetRenderer
    @Override
    public RenderWidgetOutput render(RenderWidgetInput input) throws QException
    {
-      JobsSecurity.ensureSessionKeys(QContext.getQSession());
+      DurableJobsSecurity.ensureSessionKeys(QContext.getQSession());
       Instant now = Instant.now();
       QWidgetData data = switch(input.getWidgetMetaData().getName())
       {
@@ -177,7 +177,7 @@ public class JobsWidgetRenderer extends AbstractWidgetRenderer
     *******************************************************************************/
    public static List<QRecord> query(String table, QQueryFilter filter) throws QException
    {
-      JobsSecurity.ensureSessionKeys(QContext.getQSession());
+      DurableJobsSecurity.ensureSessionKeys(QContext.getQSession());
       return (new QueryAction().execute(new QueryInput().withTableName(table).withFilter(filter)
          .withShouldFetchHeavyFields(true)).getRecords());
    }

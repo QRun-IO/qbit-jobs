@@ -22,6 +22,7 @@
 package com.kingsrook.qbits.jobs;
 
 
+import com.kingsrook.qqq.backend.core.jobs.DurableJobsSecurity;
 import com.kingsrook.qqq.backend.core.model.session.QSession;
 import com.kingsrook.qqq.backend.core.model.session.QSystemUserSession;
 import com.kingsrook.qqq.backend.core.model.session.QUser;
@@ -45,13 +46,13 @@ class JobsSecurityTest
    {
       QSession session = new QSession().withUser(new QUser().withIdReference("user"))
          .withSecurityKeyValue(JOBS_USER, "wrong").withSecurityKeyValue(JOBS_USER_ALL_ACCESS, true);
-      JobsSecurity.applyToSession(session);
+      DurableJobsSecurity.applyToSession(session);
       assertThat(session.getSecurityKeyValues(JOBS_USER)).containsExactly("user");
       assertThat(session.getSecurityKeyValues(JOBS_USER_ALL_ACCESS)).isEmpty();
       session.withPermission(JOBS_ADMIN);
-      JobsSecurity.applyToSession(session);
+      DurableJobsSecurity.applyToSession(session);
       assertThat(session.getSecurityKeyValues(JOBS_USER_ALL_ACCESS)).containsExactly(true);
-      JobsSecurity.ensureSessionKeys(session);
+      DurableJobsSecurity.ensureSessionKeys(session);
       assertThat(session.getSecurityKeyValues(JOBS_USER)).containsExactly("user");
    }
 
@@ -61,15 +62,15 @@ class JobsSecurityTest
    @Test
    void nullAnonymousAndSystem()
    {
-      JobsSecurity.applyToSession(null);
-      JobsSecurity.ensureSessionKeys(null);
-      JobsSecurity.applyToSession(new QSystemUserSession());
-      JobsSecurity.ensureSessionKeys(new QSystemUserSession());
-      assertThat(JobsSecurity.userId(null)).isNull();
+      DurableJobsSecurity.applyToSession(null);
+      DurableJobsSecurity.ensureSessionKeys(null);
+      DurableJobsSecurity.applyToSession(new QSystemUserSession());
+      DurableJobsSecurity.ensureSessionKeys(new QSystemUserSession());
+      assertThat(DurableJobsSecurity.userId(null)).isNull();
       QSession anonymous = new QSession();
-      JobsSecurity.ensureSessionKeys(anonymous);
-      assertThat(JobsSecurity.userId(anonymous)).isNull();
+      DurableJobsSecurity.ensureSessionKeys(anonymous);
+      assertThat(DurableJobsSecurity.userId(anonymous)).isNull();
       assertThat(anonymous.getSecurityKeyValues(JOBS_USER)).isEmpty();
-      JobsSecurity.ensureSessionKeys(new QSession().withUser(new QUser().withIdReference("")));
+      DurableJobsSecurity.ensureSessionKeys(new QSession().withUser(new QUser().withIdReference("")));
    }
 }

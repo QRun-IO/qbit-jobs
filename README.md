@@ -8,7 +8,7 @@ from QRun-IO/qqq `docs/specs/DURABLE-JOBS-AND-ASSISTED-BULK-LOAD.md`.
 
 ## Requirements
 - Java 21.
-- QQQ 4.1 with durable jobs enabled: `DurableJobsMetaDataProvider.defineAll(...)` and
+- QQQ 4.1.0-RC.7 or later with durable jobs enabled: `DurableJobsMetaDataProvider.defineAll(...)` and
   `DurableJobsMetaData` on the instance.
 - A storage table for chunk objects and uploads, which should be object storage (S3).
 
@@ -74,39 +74,21 @@ With no parent configured, Jobs remains a top-level app. Placement does not gran
 
 ## Build
 ```bash
-./mvnw -o verify    # CI/release dependency: QQQ 4.1.0-RC.8
-./mvnw -o -Dqqq.snapshot.version=4.1.0-SNAPSHOT verify  # locally installed core branch
-# Windows: use ./mvnw.cmd
+./mvnw -o verify    # tests, checkstyle (main and test sources), JaCoCo gate
 ```
 
-The local demo server (`src/demo/java`, used for the screenshots) runs against a locally installed
-QQQ build that has the durable job kernel, under a private version so it never replaces a shared
-SNAPSHOT:
+The local demo server (`src/demo/java`, used for the screenshots) uses released QQQ
+4.1.0-RC.7 through the `demo` profile; no locally installed kernel build is needed.
 ```bash
-# in a QQQ checkout of feature/durable-jobs-chunked:
-mvn install -DskipTests -Drevision=4.1.0-JOBS-SNAPSHOT
-# here:
-./mvnw -Pdemo -Dqqq.snapshot.version=4.1.0-JOBS-SNAPSHOT test-compile exec:java    -Dexec.classpathScope=test -Dexec.mainClass=com.kingsrook.qbits.jobs.demo.JobsDemoServer
+./mvnw -o -Pdemo test-compile exec:java -Dexec.classpathScope=test -Dexec.mainClass=com.kingsrook.qbits.jobs.demo.JobsDemoServer
 # then open http://localhost:8000/app/jobs
 ```
+On Windows use `./mvnw.cmd` in place of `./mvnw`.
 
-## Compatibility and display
+## Display
 
-The default build targets core **4.1.0-RC.8**, which will ship the progress/log API.
-Local verification can override `qqq.snapshot.version` with the installed branch SNAPSHOT,
-without enabling the demo profile. Older metadata remains tolerated: optional progress
-fields may be absent/null, and Log requires both `jobs_log` and its inferred job join.
-The existing compatibility bridges cover these core contracts:
-
-- `QRun-IO/qqq#1178`: the jobs tables, constants and security metadata (alert types
-  `jobs.job-failed` and `jobs.job-stalled`).
-- `QRun-IO/qqq#1191`: the optional `jobs_effect` outbox and `jobs.effect-unresolved` alert.
-  Effects child lists require the table and its job join; effect statistics and retention
-  checks are enabled when the table exists. The app also works without that table.
-- `QRun-IO/qqq#1173`: `StorageAction.deleteObject`. Until present, object deletion logs
-  once and is skipped. Job/child row retention still runs. Cleanup of inputs on retained
-  clean jobs preserves their references when deletion is unavailable, allowing retry.
-  Objects belonging to fully purged jobs may need the host's storage lifecycle policy.
+The job progress fields and the Log list need QQQ 4.1.0-RC.8 or later; on older metadata
+the optional progress fields may be absent and the Log list is left out.
 
 The app produces typed data only, with no HTML. The widget label is each card's title,
 so the data carries no second title.
@@ -130,13 +112,12 @@ Retention is admin/system-only and restores the original session even on failure
 Its output contains standard process summary lines for jobs purged, chunk objects
 removed during purge, and input objects removed (uploads plus retained-job inputs).
 Jobs with effects outside SENT/FAILED, or with effects needing review, keep their rows
-and inputs. When any are skipped, the summary includes "N jobs kept: effects still outstanding".
+and inputs. When any are skipped, the summary includes "N jobs kept: effects still unsettled".
 The Log list follows Live Progress, before Events: level, time, phase and message,
-ordered by `id` ascending (newest last), full width, with the standard child-list
-25-row limit and View all link. Live Progress also shows explicit ETA and a notice
-when `logDropped` is positive. The log is read-only for users, including admins;
-retention deletes it through the existing system session in 200-row keyset batches
-with 64-bit log cursors, before deleting chunks and jobs.
+newest first, full width, with the standard child-list 25-row limit and View all link.
+Live Progress also shows the ETA and a notice when `logDropped` is positive. The log is
+read-only for users, including admins; retention deletes it through the system session in
+keyset batches with 64-bit log cursors, before deleting chunks and jobs.
 
 Needs attention shows each listed job's effect-review count; Live Progress adds an Effects
 group (Sent, Pending, Failed, Needs review) when the job has effects.

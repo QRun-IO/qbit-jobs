@@ -93,8 +93,7 @@ Optional names remain in `JobsCoreContract` without importing `core.jobs`.
 - It deletes jobs that finished more than `retentionDays` ago (default 30), with their chunks, row
   errors, effects, logs, events and chunk objects. Effects are removed before chunks and jobs.
 - Jobs with any effect outside SENT/FAILED, or any effect needing review, keep their rows
-  and inputs. The summary reports "N jobs kept: effects still outstanding" when any are skipped.
-  Cores without the effects table retain the existing behavior.
+  and inputs. The summary reports "N jobs kept: effects still unsettled" when any are skipped.
 - For COMPLETED jobs with no failed rows, it deletes the chunk input objects after
   `inputRetentionDays` (default 7).
 - Each run's summary is the standard process summary.
@@ -103,12 +102,9 @@ Optional names remain in `JobsCoreContract` without importing `core.jobs`.
 `JobsIntegrations.esbTableNames()`, `quickSearchTables()` and `dataAnalysisTables()`: a host passes
 these to qqq-esb, qbit-quick-search and qbit-data-analysis.
 
-## Dependencies and stand-ins
-The qbit builds against the released QQQ RC through the default `qqq-snapshot` profile. Until the
-kernel ships in an RC, the core names it needs (table, field and process names, and the jobs session
-keys) are mirrored in `JobsCoreContract`, tagged
-`STAND-IN(core=QRun-IO/qqq#1178, removeBy=RC.7)`. Replacing the remaining mirrored constants and older-metadata test fixtures with
-core imports is a separate compatibility cleanup; this change retains them.
-The optional outbox additions carry `STAND-IN(core=QRun-IO/qqq#1191, removeBy=RC.7)`.
-The demo server (`-Pdemo`, under `src/demo/java`) runs against a locally installed 4.1.0-SNAPSHOT of
-the kernel branch. It is how the screenshots are taken.
+## Dependencies
+Requires QQQ 4.1.0-RC.8 or later (job progress and `jobs_log`). The default `qqq-snapshot` profile and the opt-in
+`demo` profile both use released RC.8. Core provides table metadata, joins, possible
+values, session security, signal identifiers and storage deletion. The qbit declares
+the alert types and retains only field names that core does not export.
+The demo server under `src/demo/java` uses the same released kernel.

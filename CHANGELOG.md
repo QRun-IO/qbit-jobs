@@ -5,6 +5,10 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [0.1.0] - Unreleased
 
+### Changed
+
+- Built on QQQ 4.1.0-RC.7; stand-ins removed.
+
 ### Added
 
 - RC.8 optional job progress fields: phase labels, explicit percent with legacy fallback,
@@ -27,18 +31,18 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `jobs.effect-unresolved` warning alert for effects requiring outcome review.
 - Retention deletes settled effects and preserves jobs and inputs with outstanding
   effects, reporting the number kept in the process summary.
-- RC.7 outbox contract/test stand-ins, Postgres table and indexes, and coverage for
-  effect counts, owner isolation, retention and cores without the effects table.
+- Outbox Postgres table and indexes, and coverage for effect counts, owner isolation
+  and retention.
 
 - Jobs app with six typed home widgets for live progress, throughput, attention,
   worker health and 30-day history, scoped to each viewer's record permissions.
 - Job progress, ordered chunk/error/event child lists, and filtered audit links.
 - Core-compatible failure/stall alert declarations and a reaper heartbeat monitor.
 - Configurable, hidden, scheduled retention with system-session isolation, paged
-  deletion, object cleanup compatibility and standard process summary lines.
+  deletion, object cleanup and standard process summary lines.
 - Opt-in ESB, Quick Search and Data Analysis registration lists.
 - Postgres DDL for the core tables and indexes.
-- Released RC.5 contract/security/storage stand-ins and memory-backed tests.
+- Memory-backed tests using core durable jobs metadata and storage actions.
 - Offline Maven wrapper build with checkstyle and JaCoCo coverage enforcement.
 - Readable home widgets:
   - block cells with record links and progress bars;

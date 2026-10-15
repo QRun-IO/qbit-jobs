@@ -206,12 +206,12 @@
          </repositories>
       </profile>
 
-      <!-- Local demo server and screenshots only (never in CI): builds src/demo/java against a  -->
-      <!-- locally installed QQQ with the durable job kernel, e.g. -Dqqq.snapshot.version=4.1.0-JOBS-SNAPSHOT. -->
+      <!-- Local demo server and screenshots: builds src/demo/java against released QQQ RC.7. -->
+      <!-- The version property remains overridable, as in the default profile. -->
       <profile>
          <id>demo</id>
          <properties>
-            <qqq.snapshot.version>4.1.0-SNAPSHOT</qqq.snapshot.version>
+            <qqq.snapshot.version>4.1.0-RC.7</qqq.snapshot.version>
          </properties>
          <dependencyManagement>
             <dependencies>

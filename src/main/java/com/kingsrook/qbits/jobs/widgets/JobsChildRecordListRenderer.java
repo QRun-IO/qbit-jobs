@@ -22,10 +22,10 @@
 package com.kingsrook.qbits.jobs.widgets;
 
 
-import com.kingsrook.qbits.jobs.JobsSecurity;
 import com.kingsrook.qqq.backend.core.actions.dashboard.widgets.ChildRecordListRenderer;
 import com.kingsrook.qqq.backend.core.context.QContext;
 import com.kingsrook.qqq.backend.core.exceptions.QException;
+import com.kingsrook.qqq.backend.core.jobs.DurableJobsSecurity;
 import com.kingsrook.qqq.backend.core.model.actions.widgets.RenderWidgetInput;
 import com.kingsrook.qqq.backend.core.model.actions.widgets.RenderWidgetOutput;
 
@@ -41,7 +41,7 @@ public class JobsChildRecordListRenderer extends ChildRecordListRenderer
    @Override
    public RenderWidgetOutput render(RenderWidgetInput input) throws QException
    {
-      JobsSecurity.ensureSessionKeys(QContext.getQSession());
+      DurableJobsSecurity.ensureSessionKeys(QContext.getQSession());
       return (super.render(input));
    }
 }
