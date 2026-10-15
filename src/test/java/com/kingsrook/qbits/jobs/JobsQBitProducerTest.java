@@ -97,13 +97,13 @@ class JobsQBitProducerTest extends BaseJobsTest
    @Test
    void navigationWidgetsAndRecordSections()
    {
-      assertThat(instance.getTables()).hasSize(11);
+      assertThat(instance.getTables()).hasSize(12);
       assertThat(instance.getApp("jobs").getChildren()).extracting(child -> child.getName()).containsExactly(JOBS_JOB);
       assertThat(instance.getApp("jobs").getWidgets()).containsExactlyElementsOf(JobsQBitProducer.HOME_WIDGETS);
-      assertThat(instance.getWidgets()).hasSize(12);
+      assertThat(instance.getWidgets()).hasSize(13);
       assertThat(instance.getWidgets().values()).allSatisfy(widget -> assertThat(widget.getType()).isNotEqualTo(WidgetType.HTML.getType()));
       assertThat(instance.getTable(JOBS_JOB).getSections()).extracting(QFieldSection::getWidgetName)
-         .containsSubsequence("jobsJobProgress", "jobsJobChunks", "jobsJobRowErrors", "jobsJobEffects", "jobsJobEvents", "jobsJobAudit");
+         .containsSubsequence("jobsJobProgress", "jobsJobLog", "jobsJobChunks", "jobsJobRowErrors", "jobsJobEffects", "jobsJobEvents", "jobsJobAudit");
       for(String name : JobsQBitProducer.HOME_WIDGETS)
       {
          assertThat(instance.getWidget(name).getDefaultValues()).containsEntry("refreshSeconds", 5);
@@ -132,7 +132,7 @@ class JobsQBitProducerTest extends BaseJobsTest
          .withPurgeCronExpression("0 0 4 * * ?").withHomeRefreshSeconds(9).withRecordRefreshSeconds(8);
       new JobsQBitProducer().withQBitConfig(custom).produce(other);
       assertThat(other.getWidget("jobsJobAudit")).isNull();
-      assertThat(other.getWidgets()).hasSize(11);
+      assertThat(other.getWidgets()).hasSize(12);
       assertThat(other.getApp("backgroundJobs")).isNotNull();
       QScheduleMetaData schedule = other.getProcess(JobsQBitProducer.PURGE_PROCESS).getSchedule();
       assertThat(schedule.getSchedulerName()).isEqualTo("scheduler");

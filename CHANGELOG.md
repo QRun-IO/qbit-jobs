@@ -11,6 +11,21 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- RC.8 optional job progress fields: phase labels, explicit percent with legacy fallback,
+  message, binary byte counts, ETA and dropped-log notice in typed widgets.
+- Full-width owner-scoped Log child list after Live Progress, ascending by log ID.
+- System-session retention of log lines, including 64-bit cursors and 200-row batches.
+- Host `parentAppName` configuration for Admin > Operations > Jobs placement.
+- Progress/log, owner isolation, real core log permission and navigation tests.
+
+### Changed
+
+- Default QQQ BOM from 4.1.0-RC.5 to 4.1.0-RC.8; existing `qqq.snapshot.version`
+  override verifies against locally installed 4.1.0-SNAPSHOT without the demo profile.
+- Storage adapter test now verifies failure/reference preservation with the current API.
+
+### Earlier additions
+
 - Optional effects outbox child list, viewer-scoped attention review counts and typed
   Live Progress effect statistics; Data Analysis includes `jobs_effect`.
 - `jobs.effect-unresolved` warning alert for effects requiring outcome review.

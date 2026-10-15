@@ -23,6 +23,29 @@ and phase 4. Owner decisions: all of that spec's recommendations are accepted (2
 - **R6, storage.** Retention deletes finished jobs and their chunk objects from object storage. The
   qbit reads and writes no files.
 
+## Progress and log adoption (core RC.8)
+
+Implements sections 2 and 7 of core `JOB-PROGRESS-AND-JOBS-TRAY.md`. The default
+BOM is 4.1.0-RC.8; local verification uses `-Dqqq.snapshot.version=4.1.0-SNAPSHOT`.
+Optional names remain in `JobsCoreContract` without importing `core.jobs`.
+
+- Home and Live Progress prefer nullable `percentDone`, including explicit zero,
+  then retain rows/chunks derivation. The snapshot supplies the current phase label;
+  missing or invalid JSON falls back to `currentPhase`. Both views include the
+  progress message, optional binary byte counts, and explicit `etaSeconds` ahead
+  of the existing rate-derived ETA. No HTML, fixed widths, or theme-specific colors.
+- Log is a full-width standard child list immediately after Live Progress, before
+  Events, only if both table and join exist. It displays level, loggedAt, phase and
+  message, sorted by id ascending, with the standard 25-row preview/View all.
+  The panel reads through the current viewer and core joined owner lock.
+- A positive `logDropped` produces an earlier-lines-not-kept notice in Live Progress.
+- Retention deletes logs before chunks/jobs, using the existing 200-row keyset loop
+  with a long child cursor. Core `JobLogPermissions` explicitly permits system
+  sessions and denies user mutations even for admins. Tests load the actual checker.
+- Hosts set `parentAppName` to their existing Operations app under Admin; the qbit
+  sets the parent and attaches Jobs as a child, while retaining configurable appName.
+  Missing/self parents fail validation before registration. Default remains top-level.
+
 ## The app
 - `jobs` app, label **Jobs**. The nav lists `jobs_job` only. Chunks, row errors, effects and events are child
   lists on the job record.
@@ -57,7 +80,7 @@ and phase 4. Owner decisions: all of that spec's recommendations are accepted (2
     without needsReview), Failed and Needs review. Review effects appear only in Needs review.
     The group is omitted when there are no effects or the effects table is absent.
     It refreshes every 3s while the job is active.
-  - Child lists for **Chunks**, **Row errors**, **Effects** and **Events**. Effects is
+  - Child lists for **Log**, **Chunks**, **Row errors**, **Effects** and **Events**. Effects is
     included only when the effects table and its inferred job join exist; it uses the same
     joined owner lock as row errors.
   - A **Changes made by this job** link to the audit table, filtered to messages containing
@@ -68,7 +91,7 @@ and phase 4. Owner decisions: all of that spec's recommendations are accepted (2
 ## Retention
 `jobsPurgeFinished` is a hidden scheduled process, not in the nav. It runs daily by default.
 - It deletes jobs that finished more than `retentionDays` ago (default 30), with their chunks, row
-  errors, effects, events and chunk objects. Effects are removed before chunks and jobs.
+  errors, effects, logs, events and chunk objects. Effects are removed before chunks and jobs.
 - Jobs with any effect outside SENT/FAILED, or any effect needing review, keep their rows
   and inputs. The summary reports "N jobs kept: effects still unsettled" when any are skipped.
 - For COMPLETED jobs with no failed rows, it deletes the chunk input objects after
@@ -80,8 +103,8 @@ and phase 4. Owner decisions: all of that spec's recommendations are accepted (2
 these to qqq-esb, qbit-quick-search and qbit-data-analysis.
 
 ## Dependencies
-Requires QQQ 4.1.0-RC.7 or later. The default `qqq-snapshot` profile and the opt-in
-`demo` profile both use released RC.7. Core provides table metadata, joins, possible
+Requires QQQ 4.1.0-RC.8 or later (job progress and `jobs_log`). The default `qqq-snapshot` profile and the opt-in
+`demo` profile both use released RC.8. Core provides table metadata, joins, possible
 values, session security, signal identifiers and storage deletion. The qbit declares
 the alert types and retains only field names that core does not export.
 The demo server under `src/demo/java` uses the same released kernel.
