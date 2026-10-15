@@ -60,6 +60,7 @@ import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_CHUNK;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_EFFECT;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_EVENT;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_JOB;
+import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_LOG;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_ROW_ERROR;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOBS_UPLOAD;
 import static com.kingsrook.qbits.jobs.JobsCoreContract.JOB_ID;
@@ -159,6 +160,10 @@ public class JobsPurgeFinishedStep implements BackendStep
             {
                removeChildren(JOBS_EFFECT, lastId, counts);
             }
+            if(QContext.getQInstance().getTable(JOBS_LOG) != null)
+            {
+               removeChildren(JOBS_LOG, lastId, counts);
+            }
             removeChildren(JOBS_ROW_ERROR, lastId, counts);
             removeChildren(JOBS_EVENT, lastId, counts);
             removeChildren(JOBS_CHUNK, lastId, counts);
@@ -191,7 +196,7 @@ public class JobsPurgeFinishedStep implements BackendStep
     *******************************************************************************/
    private void removeChildren(String table, int jobId, int[] counts) throws QException
    {
-      int lastId = 0;
+      long lastId = 0;
       while(true)
       {
          List<QRecord> records = batch(table, new QQueryFilter().withCriteria(JOB_ID, QCriteriaOperator.EQUALS, jobId), lastId);
@@ -201,7 +206,7 @@ public class JobsPurgeFinishedStep implements BackendStep
          }
          for(QRecord record : records)
          {
-            lastId = record.getValueInteger(ID);
+            lastId = record.getValueLong(ID);
             if(JOBS_CHUNK.equals(table) && storage.delete(storage.chunkStorageTable(), record.getValueString(INPUT_STORAGE_REF)))
             {
                counts[1]++;
@@ -276,7 +281,7 @@ public class JobsPurgeFinishedStep implements BackendStep
    /*******************************************************************************
     ** Keyset pagination remains correct when rows are deleted or updated.
     *******************************************************************************/
-   private List<QRecord> batch(String table, QQueryFilter filter, int lastId) throws QException
+   private List<QRecord> batch(String table, QQueryFilter filter, long lastId) throws QException
    {
       return (new QueryAction().execute(new QueryInput().withTableName(table).withFilter(filter.withCriteria(ID, QCriteriaOperator.GREATER_THAN, lastId)
          .withOrderBy(new QFilterOrderBy(ID)).withLimit(BATCH_SIZE))).getRecords());
