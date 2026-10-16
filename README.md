@@ -42,6 +42,9 @@ The tables are core's, prefixed `jobs_`. This qbit adds no tables.
 
 ## Permissions
 - Users see their own jobs: core's record lock on `jobs_job.userId` through the `jobs_user` key.
+- The Jobs app and its home widgets require `<appName>.hasAccess` (default `jobs.hasAccess`, from
+  `JobsQBitConfig.getHasAccessPermissionName()`); without it they are hidden. Hosts must grant it to the
+  users who should see the Jobs app. The header Jobs tray and record locks are unaffected.
 - `jobs_admin` sees and controls every job, and sees the Workers widget.
 - Apply the keys in your auth customizer with `DurableJobsSecurity.applyToSession(session)`.
 

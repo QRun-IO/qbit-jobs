@@ -83,6 +83,15 @@ public class JobsQBitConfig implements QBitConfig
    }
 
    /*******************************************************************************
+    ** The permission a user needs to see the Jobs app and its home widgets,
+    ** "<appName>.hasAccess" (default "jobs.hasAccess"). Hosts must grant it.
+    *******************************************************************************/
+   public String getHasAccessPermissionName()
+   {
+      return (appName + ".hasAccess");
+   }
+
+   /*******************************************************************************
     ** Get appName.
     *******************************************************************************/
    public String getAppName()
