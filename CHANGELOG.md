@@ -5,6 +5,12 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [0.1.0] - Unreleased
 
+### Security
+
+- The Jobs app and its five non-admin home widgets now require `<appName>.hasAccess`
+  (default `jobs.hasAccess`) and are hidden otherwise. Behaviour change: hosts must grant
+  this permission to the users who should see the Jobs app. Workers still needs `jobs_admin`.
+
 ### Changed
 
 - Built on QQQ 4.1.0-RC.7; stand-ins removed.
