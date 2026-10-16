@@ -139,7 +139,7 @@ class JobsProgressTest extends BaseJobsTest
          .withValue(PROGRESS_MESSAGE, "Uploading manifest").withValue(BYTES_DONE, 1536L).withValue(BYTES_TOTAL, 1048576L)
          .withValue(ETA_SECONDS, 90L).withValue(LOG_DROPPED, 12)
          .withValue(PROGRESS_JSON, "{\"phases\":[{\"name\":\"upload\",\"label\":\"Upload backup\"}]}"));
-      login(USER_A, false);
+      login(USER_A, false).withPermission(config.getHasAccessPermissionName());
       TableData home = (TableData) render("jobsHomeActive", null);
       assertThat(home.getRows()).singleElement().satisfies(row -> assertThat(row)
          .containsEntry("Progress", "73%").containsEntry("Phase", "Upload backup")
@@ -148,7 +148,7 @@ class JobsProgressTest extends BaseJobsTest
       MultiStatisticsData record = (MultiStatisticsData) render("jobsJobProgress", job.getValueString(ID));
       assertThat(record.getStatisticsGroupData()).extracting(MultiStatisticsData.StatisticsGroupData::getSubheader)
          .contains("Upload backup | Uploading manifest | 1.5 KiB / 1.0 MiB", "73% done", "ETA in 1m", "12 earlier lines not kept");
-      login(USER_B, false);
+      login(USER_B, false).withPermission(config.getHasAccessPermissionName());
       assertThat(((TableData) render("jobsHomeActive", null)).getRows()).isEmpty();
       assertThat(((MultiStatisticsData) render("jobsJobProgress", job.getValueString(ID))).getStatisticsGroupData()).isEmpty();
    }

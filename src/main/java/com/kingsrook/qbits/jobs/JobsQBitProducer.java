@@ -45,6 +45,7 @@ import com.kingsrook.qqq.backend.core.model.metadata.code.QCodeReference;
 import com.kingsrook.qqq.backend.core.model.metadata.dashboard.QWidgetMetaData;
 import com.kingsrook.qqq.backend.core.model.metadata.layout.QAppMetaData;
 import com.kingsrook.qqq.backend.core.model.metadata.layout.QIcon;
+import com.kingsrook.qqq.backend.core.model.metadata.permissions.DenyBehavior;
 import com.kingsrook.qqq.backend.core.model.metadata.permissions.PermissionLevel;
 import com.kingsrook.qqq.backend.core.model.metadata.permissions.QPermissionRules;
 import com.kingsrook.qqq.backend.core.model.metadata.processes.QBackendStepMetaData;
@@ -167,8 +168,16 @@ public class JobsQBitProducer implements QBitMetaDataProducer<JobsQBitConfig>
       QWidgetMetaData workers = registerWidget(instance, "jobsHomeWorkers", "Workers", WidgetType.TABLE, qBitConfig.getHomeRefreshSeconds());
       workers.withPermissionRules(adminRules());
       registerWidget(instance, "jobsHomeHistory", "Job history", WidgetType.STACKED_BAR_CHART, qBitConfig.getHomeRefreshSeconds());
+      for(String name : HOME_WIDGETS)
+      {
+         if(!"jobsHomeWorkers".equals(name))
+         {
+            instance.getWidget(name).setPermissionRules(appAccessRules());
+         }
+      }
       QAppMetaData app = new QAppMetaData().withName(qBitConfig.getAppName()).withLabel("Jobs").withIcon(new QIcon("pending_actions"))
-         .withChild(instance.getTable(JOBS_JOB)).withWidgets(new ArrayList<>(HOME_WIDGETS));
+         .withChild(instance.getTable(JOBS_JOB)).withWidgets(new ArrayList<>(HOME_WIDGETS))
+         .withPermissionRules(appAccessRules());
       app.setParentAppName(qBitConfig.getParentAppName());
       instance.addApp(app);
       if(qBitConfig.getParentAppName() != null)
@@ -233,6 +242,16 @@ public class JobsQBitProducer implements QBitMetaDataProducer<JobsQBitConfig>
    {
       instance.getTable(JOBS_JOB).withSection(new QFieldSection().withName(widgetName).withLabel(label)
          .withTier(Tier.T2).withWidgetName(widgetName).withGridColumns(12));
+   }
+
+   /*******************************************************************************
+    ** The Jobs app and its home widgets require "<appName>.hasAccess"; users
+    ** without it never see the app or its widgets (hidden, not locked).
+    *******************************************************************************/
+   private QPermissionRules appAccessRules()
+   {
+      return (new QPermissionRules().withLevel(PermissionLevel.HAS_ACCESS_PERMISSION)
+         .withPermissionBaseName(qBitConfig.getAppName()).withDenyBehavior(DenyBehavior.HIDDEN));
    }
 
    /*******************************************************************************
